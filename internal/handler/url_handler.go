@@ -1,0 +1,77 @@
+package handler
+
+import (
+	"io"
+	"net/http"
+	"strings"
+
+	"github.com/Gustik/shortener/internal/service"
+)
+
+type URLHandler struct {
+	service service.URLService
+}
+
+func NewURLHandler(service service.URLService) *URLHandler {
+	return &URLHandler{
+		service: service,
+	}
+}
+
+func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if r.Header.Get("Content-Type") != "text/plain" {
+		http.Error(w, "Invalid content type", http.StatusBadRequest)
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	defer r.Body.Close()
+
+	if err != nil {
+		http.Error(w, "Failed to read body", http.StatusBadRequest)
+		return
+	}
+
+	originalURL := strings.TrimSpace(string(body))
+	if originalURL == "" {
+		http.Error(w, "URL cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	shortURL, err := h.service.ShortenURL(originalURL)
+	if err != nil {
+		http.Error(w, "Failed to shorten URL", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte(shortURL))
+}
+
+func (h *URLHandler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	shortID := strings.TrimPrefix(r.URL.Path, "/")
+	if shortID == "" {
+		http.Error(w, "Short ID is required", http.StatusBadRequest)
+		return
+	}
+
+	originalURL, err := h.service.GetOriginalURL(shortID)
+	if err != nil {
+		http.Error(w, "URL not found", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Location", originalURL)
+	w.WriteHeader(http.StatusTemporaryRedirect)
+}
