@@ -93,7 +93,7 @@ func TestURLHandler_GetOriginalURL(t *testing.T) {
 		method       string
 		expectedCode int
 		expectedBody string
-		expectedUrl  string
+		expectedURL  string
 	}{
 		{
 			name:         "Неправильный method",
@@ -122,7 +122,7 @@ func TestURLHandler_GetOriginalURL(t *testing.T) {
 			url:          "https://ya.ru",
 			method:       http.MethodGet,
 			expectedCode: http.StatusTemporaryRedirect,
-			expectedUrl:  "https://ya.ru",
+			expectedURL:  "https://ya.ru",
 		},
 	}
 
@@ -144,7 +144,7 @@ func TestURLHandler_GetOriginalURL(t *testing.T) {
 			assert.Equal(t, tt.expectedCode, w.Code)
 
 			if tt.expectedCode == http.StatusTemporaryRedirect {
-				assert.Equal(t, tt.expectedUrl, w.Header().Get("Location"))
+				assert.Equal(t, tt.expectedURL, w.Header().Get("Location"))
 			} else {
 				assert.Contains(t, w.Body.String(), tt.expectedBody)
 			}
