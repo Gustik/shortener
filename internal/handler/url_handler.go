@@ -60,7 +60,7 @@ func (h *URLHandler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortID := strings.TrimPrefix(r.URL.Path, "/")
+	shortID := GetShortID(r.URL.Path)
 	if shortID == "" {
 		http.Error(w, "Short ID is required", http.StatusBadRequest)
 		return
@@ -68,10 +68,14 @@ func (h *URLHandler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
 
 	originalURL, err := h.service.GetOriginalURL(shortID)
 	if err != nil {
-		http.Error(w, "URL not found", http.StatusBadRequest)
+		http.Error(w, "URL not found", http.StatusNotFound)
 		return
 	}
 
 	w.Header().Set("Location", originalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func GetShortID(path string) string {
+	return strings.TrimPrefix(path, "/")
 }

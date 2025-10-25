@@ -17,7 +17,7 @@ type URLRepository interface {
 
 type InMemoryURLRepository struct {
 	mu   sync.RWMutex
-	urls map[string]string // map[shortID]originalURL
+	urls map[string]string
 }
 
 func NewInMemoryURLRepository() *InMemoryURLRepository {
