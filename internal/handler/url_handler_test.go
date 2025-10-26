@@ -34,14 +34,6 @@ func TestURLHandler_ShortenURL(t *testing.T) {
 			expectedBody: baseURL,
 		},
 		{
-			name:         "Неправильный method",
-			method:       http.MethodGet,
-			contentType:  "text/plain",
-			body:         "https://ya.ru",
-			expectedCode: http.StatusMethodNotAllowed,
-			expectedBody: "Method not allowed",
-		},
-		{
 			name:         "Неправильный content type",
 			method:       http.MethodPost,
 			contentType:  "application/json",
@@ -61,6 +53,7 @@ func TestURLHandler_ShortenURL(t *testing.T) {
 
 	repo := repository.NewMockURLRepository()
 	service := service.NewURLService(repo, baseURL)
+	router := handler.SetupRoutes(handler.NewURLHandler(service))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -69,8 +62,7 @@ func TestURLHandler_ShortenURL(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			h := handler.NewURLHandler(service)
-			h.ShortenURL(w, r)
+			router.ServeHTTP(w, r)
 
 			assert.Equal(t, tt.expectedCode, w.Code, "Код не тот что ждем")
 
@@ -96,20 +88,6 @@ func TestURLHandler_GetOriginalURL(t *testing.T) {
 		expectedURL  string
 	}{
 		{
-			name:         "Неправильный method",
-			path:         "/somepath",
-			method:       http.MethodPost,
-			expectedCode: http.StatusMethodNotAllowed,
-			expectedBody: "Method not allowed",
-		},
-		{
-			name:         "Пустой shortID",
-			path:         "/",
-			method:       http.MethodGet,
-			expectedCode: http.StatusBadRequest,
-			expectedBody: "Short ID is required",
-		},
-		{
 			name:         "Не существующие url",
 			path:         "/notexists",
 			method:       http.MethodGet,
@@ -128,18 +106,18 @@ func TestURLHandler_GetOriginalURL(t *testing.T) {
 
 	repo := repository.NewMockURLRepository()
 	service := service.NewURLService(repo, baseURL)
+	router := handler.SetupRoutes(handler.NewURLHandler(service))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.expectedCode == http.StatusTemporaryRedirect {
-				repo.Save(handler.GetShortID(tt.path), tt.url)
+				repo.Save(strings.TrimPrefix(tt.path, "/"), tt.url)
 			}
 
-			h := handler.NewURLHandler(service)
 			r := httptest.NewRequest(tt.method, tt.path, nil)
 			w := httptest.NewRecorder()
 
-			h.GetOriginalURL(w, r)
+			router.ServeHTTP(w, r)
 
 			assert.Equal(t, tt.expectedCode, w.Code)
 

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Gustik/shortener/internal/service"
+	"github.com/go-chi/chi/v5"
 )
 
 type URLHandler struct {
@@ -19,16 +20,6 @@ func NewURLHandler(service service.URLService) *URLHandler {
 }
 
 func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	if r.Header.Get("Content-Type") != "text/plain" {
-		http.Error(w, "Invalid content type", http.StatusBadRequest)
-		return
-	}
-
 	body, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
 
@@ -55,12 +46,7 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *URLHandler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	shortID := GetShortID(r.URL.Path)
+	shortID := chi.URLParam(r, "id")
 	if shortID == "" {
 		http.Error(w, "Short ID is required", http.StatusBadRequest)
 		return
