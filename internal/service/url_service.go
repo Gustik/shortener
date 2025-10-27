@@ -3,9 +3,16 @@ package service
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 
 	"github.com/Gustik/shortener/internal/repository"
+)
+
+var (
+	ErrEmptyURL     = errors.New("URL cannot be empty")
+	ErrEmptyShortID = errors.New("ShortID cannot be empty")
+	ErrURLNotFound  = errors.New("URL not found")
 )
 
 type URLService interface {
@@ -26,6 +33,10 @@ func NewURLService(repo repository.URLRepository, baseURL string) URLService {
 }
 
 func (s *urlService) ShortenURL(originalURL string) (string, error) {
+	if originalURL == "" {
+		return "", ErrEmptyURL
+	}
+
 	shortID := s.generateShortID()
 
 	err := s.repo.Save(shortID, originalURL)
@@ -37,7 +48,16 @@ func (s *urlService) ShortenURL(originalURL string) (string, error) {
 }
 
 func (s *urlService) GetOriginalURL(shortID string) (string, error) {
-	return s.repo.GetByID(shortID)
+	if shortID == "" {
+		return "", ErrEmptyShortID
+	}
+
+	url, err := s.repo.GetByID(shortID)
+	if errors.Is(err, repository.ErrURLNotFound) {
+		return "", ErrURLNotFound
+	}
+
+	return url, nil
 }
 
 func (s *urlService) generateShortID() string {

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -20,21 +21,20 @@ func NewURLHandler(service service.URLService) *URLHandler {
 }
 
 func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
 
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Failed to read body", http.StatusBadRequest)
 		return
 	}
 
-	originalURL := strings.TrimSpace(string(body))
-	if originalURL == "" {
+	shortURL, err := h.service.ShortenURL(strings.TrimSpace(string(body)))
+	if errors.Is(err, service.ErrEmptyURL) {
 		http.Error(w, "URL cannot be empty", http.StatusBadRequest)
 		return
 	}
 
-	shortURL, err := h.service.ShortenURL(originalURL)
 	if err != nil {
 		http.Error(w, "Failed to shorten URL", http.StatusInternalServerError)
 		return
@@ -47,14 +47,15 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 
 func (h *URLHandler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
 	shortID := chi.URLParam(r, "id")
-	if shortID == "" {
-		http.Error(w, "Short ID is required", http.StatusBadRequest)
+
+	originalURL, err := h.service.GetOriginalURL(shortID)
+	if errors.Is(err, service.ErrURLNotFound) {
+		http.Error(w, "URL not found", http.StatusNotFound)
 		return
 	}
 
-	originalURL, err := h.service.GetOriginalURL(shortID)
 	if err != nil {
-		http.Error(w, "URL not found", http.StatusNotFound)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
