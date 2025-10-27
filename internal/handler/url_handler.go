@@ -29,7 +29,7 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err := h.service.ShortenURL(strings.TrimSpace(string(body)))
+	shortURL, err := h.service.ShortenURL(r.Context(), strings.TrimSpace(string(body)))
 	if errors.Is(err, service.ErrEmptyURL) {
 		http.Error(w, "URL cannot be empty", http.StatusBadRequest)
 		return
@@ -48,7 +48,7 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 func (h *URLHandler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
 	shortID := chi.URLParam(r, "id")
 
-	originalURL, err := h.service.GetOriginalURL(shortID)
+	originalURL, err := h.service.GetOriginalURL(r.Context(), shortID)
 	if errors.Is(err, service.ErrURLNotFound) {
 		http.Error(w, "URL not found", http.StatusNotFound)
 		return

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"errors"
 	"sync"
 )
@@ -11,8 +12,8 @@ var (
 )
 
 type URLRepository interface {
-	Save(id, originalURL string) error
-	GetByID(id string) (string, error)
+	Save(ctx context.Context, id, originalURL string) error
+	GetByID(ctx context.Context, id string) (string, error)
 }
 
 type InMemoryURLRepository struct {
@@ -26,7 +27,7 @@ func NewInMemoryURLRepository() *InMemoryURLRepository {
 	}
 }
 
-func (r *InMemoryURLRepository) Save(id, originalURL string) error {
+func (r *InMemoryURLRepository) Save(ctx context.Context, id, originalURL string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -38,7 +39,7 @@ func (r *InMemoryURLRepository) Save(id, originalURL string) error {
 	return nil
 }
 
-func (r *InMemoryURLRepository) GetByID(id string) (string, error) {
+func (r *InMemoryURLRepository) GetByID(ctx context.Context, id string) (string, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -16,8 +17,8 @@ var (
 )
 
 type URLService interface {
-	ShortenURL(originalURL string) (string, error)
-	GetOriginalURL(shortID string) (string, error)
+	ShortenURL(ctx context.Context, originalURL string) (string, error)
+	GetOriginalURL(ctx context.Context, shortID string) (string, error)
 }
 
 type urlService struct {
@@ -32,14 +33,14 @@ func NewURLService(repo repository.URLRepository, baseURL string) URLService {
 	}
 }
 
-func (s *urlService) ShortenURL(originalURL string) (string, error) {
+func (s *urlService) ShortenURL(ctx context.Context, originalURL string) (string, error) {
 	if originalURL == "" {
 		return "", ErrEmptyURL
 	}
 
 	shortID := s.generateShortID()
 
-	err := s.repo.Save(shortID, originalURL)
+	err := s.repo.Save(ctx, shortID, originalURL)
 	if err != nil {
 		return "", err
 	}
@@ -47,12 +48,12 @@ func (s *urlService) ShortenURL(originalURL string) (string, error) {
 	return fmt.Sprintf("%s/%s", s.baseURL, shortID), nil
 }
 
-func (s *urlService) GetOriginalURL(shortID string) (string, error) {
+func (s *urlService) GetOriginalURL(ctx context.Context, shortID string) (string, error) {
 	if shortID == "" {
 		return "", ErrEmptyShortID
 	}
 
-	url, err := s.repo.GetByID(shortID)
+	url, err := s.repo.GetByID(ctx, shortID)
 	if errors.Is(err, repository.ErrURLNotFound) {
 		return "", ErrURLNotFound
 	}

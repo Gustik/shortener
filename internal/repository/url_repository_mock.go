@@ -1,5 +1,7 @@
 package repository
 
+import "context"
+
 type MockURLRepository struct {
 	urls map[string]string
 }
@@ -10,7 +12,7 @@ func NewMockURLRepository() *MockURLRepository {
 	}
 }
 
-func (r *MockURLRepository) Save(id, originalURL string) error {
+func (r *MockURLRepository) Save(ctx context.Context, id, originalURL string) error {
 	if _, exists := r.urls[id]; exists {
 		return ErrURLExists
 	}
@@ -19,7 +21,7 @@ func (r *MockURLRepository) Save(id, originalURL string) error {
 	return nil
 }
 
-func (r *MockURLRepository) GetByID(id string) (string, error) {
+func (r *MockURLRepository) GetByID(ctx context.Context, id string) (string, error) {
 	originalURL, exists := r.urls[id]
 	if !exists {
 		return "", ErrURLNotFound

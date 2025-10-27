@@ -2,6 +2,7 @@ package handler_test
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -111,7 +112,7 @@ func TestURLHandler_GetOriginalURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.expectedCode == http.StatusTemporaryRedirect {
-				repo.Save(strings.TrimPrefix(tt.path, "/"), tt.url)
+				repo.Save(context.Background(), strings.TrimPrefix(tt.path, "/"), tt.url)
 			}
 
 			r := httptest.NewRequest(tt.method, tt.path, nil)
