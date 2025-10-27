@@ -19,8 +19,8 @@ func main() {
 
 	router := handler.SetupRoutes(h)
 
-	log.Printf("Запускаем сервер по адресу %s", cfg.ServerAddress)
-	if err := http.ListenAndServe(cfg.ServerAddress, router); err != nil {
+	log.Printf("Запускаем сервер по адресу %s", cfg.ServerAddress.String())
+	if err := http.ListenAndServe(cfg.ServerAddress.String(), router); err != nil {
 		log.Fatalf("Ошибка при запуске: %v", err)
 	}
 }
