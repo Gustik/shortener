@@ -52,16 +52,27 @@ type Config struct {
 func Load() *Config {
 	cfg := &Config{}
 
-	flag.Var(&cfg.ServerAddress, "a", "адрес и порт сервера в формате host:port")
-	flag.StringVar(&cfg.BaseURL, "b", "", "базовый URL для сокращенных ссылок")
+	cfg.ServerAddress.Set(defaultServerAddress)
+	cfg.BaseURL = defaultBaseURL
+
+	var serverAddrFlag string
+	var baseURLFlag string
+	flag.StringVar(&serverAddrFlag, "a", "", "адрес и порт сервера в формате host:port")
+	flag.StringVar(&baseURLFlag, "b", "", "базовый URL для сокращенных ссылок")
 	flag.Parse()
 
-	if cfg.ServerAddress.String() == "" {
-		cfg.ServerAddress.Set(getEnv("SERVER_ADDRESS", defaultServerAddress))
+	if serverAddrFlag != "" {
+		cfg.ServerAddress.Set(serverAddrFlag)
+	}
+	if baseURLFlag != "" {
+		cfg.BaseURL = baseURLFlag
 	}
 
-	if cfg.BaseURL == "" {
-		cfg.BaseURL = getEnv("BASE_URL", defaultBaseURL)
+	if envServerAddr := os.Getenv("SERVER_ADDRESS"); envServerAddr != "" {
+		cfg.ServerAddress.Set(envServerAddr)
+	}
+	if envBaseURL := os.Getenv("BASE_URL"); envBaseURL != "" {
+		cfg.BaseURL = envBaseURL
 	}
 
 	log.Println("Конфигурация загружена")
@@ -71,11 +82,4 @@ func Load() *Config {
 	log.Println("---")
 
 	return cfg
-}
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }
