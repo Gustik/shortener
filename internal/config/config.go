@@ -12,6 +12,7 @@ import (
 const (
 	defaultServerAddress = "localhost:8080"
 	defaultBaseURL       = "http://localhost:8080"
+	defaultLogLevel      = "info"
 )
 
 type NetAddr struct {
@@ -47,6 +48,7 @@ func (n *NetAddr) Set(value string) error {
 type Config struct {
 	ServerAddress NetAddr
 	BaseURL       string
+	LogLevel      string
 }
 
 func Load() *Config {
@@ -54,11 +56,14 @@ func Load() *Config {
 
 	cfg.ServerAddress.Set(defaultServerAddress)
 	cfg.BaseURL = defaultBaseURL
+	cfg.LogLevel = defaultLogLevel
 
 	var serverAddrFlag string
 	var baseURLFlag string
+	var LogLevelFlag string
 	flag.StringVar(&serverAddrFlag, "a", "", "адрес и порт сервера в формате host:port")
 	flag.StringVar(&baseURLFlag, "b", "", "базовый URL для сокращенных ссылок")
+	flag.StringVar(&LogLevelFlag, "l", "", "базовый URL для сокращенных ссылок")
 	flag.Parse()
 
 	if serverAddrFlag != "" {
@@ -74,11 +79,15 @@ func Load() *Config {
 	if envBaseURL := os.Getenv("BASE_URL"); envBaseURL != "" {
 		cfg.BaseURL = envBaseURL
 	}
+	if envLogLevel := os.Getenv("LOG_LEVEL"); envLogLevel != "" {
+		cfg.LogLevel = envLogLevel
+	}
 
 	log.Println("Конфигурация загружена")
 	log.Println("---")
 	log.Println("addr:", cfg.ServerAddress.String())
 	log.Println("baseURL:", cfg.BaseURL)
+	log.Println("logLevel:", cfg.LogLevel)
 	log.Println("---")
 
 	return cfg
