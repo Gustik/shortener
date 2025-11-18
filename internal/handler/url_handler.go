@@ -1,13 +1,17 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"strings"
 
+	"github.com/Gustik/shortener/internal/logger"
+	"github.com/Gustik/shortener/internal/models"
 	"github.com/Gustik/shortener/internal/service"
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
 
 type URLHandler struct {
@@ -43,6 +47,38 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortURL))
+}
+
+func (h *URLHandler) ShortenURLV2(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	var req models.Request
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Failed to decode json", http.StatusBadRequest)
+		return
+	}
+
+	shortURL, err := h.service.ShortenURL(r.Context(), req.URL)
+	if errors.Is(err, service.ErrEmptyURL) {
+		http.Error(w, "URL cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	if err != nil {
+		http.Error(w, "Failed to shorten URL", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	resp := models.Response{
+		Result: shortURL,
+	}
+
+	if err := json.NewEncoder(w).Encode(&resp); err != nil {
+		logger.Log.Error("failed to encode response", zap.Error(err))
+	}
 }
 
 func (h *URLHandler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {

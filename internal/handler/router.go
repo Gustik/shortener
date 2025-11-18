@@ -18,6 +18,7 @@ func SetupRoutes(handler *URLHandler) http.Handler {
 	r.Use(middleware.RealIP)          // получение реального IP
 
 	r.With(myMiddleware.ContentTypeMiddleware("text/plain")).Post("/", handler.ShortenURL)
+	r.With(myMiddleware.ContentTypeMiddleware("application/json")).Post("/api/shorten", handler.ShortenURLV2)
 	r.Get("/{id}", handler.GetOriginalURL)
 
 	return r
