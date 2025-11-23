@@ -38,14 +38,17 @@ func (s *urlService) ShortenURL(ctx context.Context, originalURL string) (string
 		return "", ErrEmptyURL
 	}
 
-	shortID := s.generateShortID()
+	shortURL := s.generateShortURL()
 
-	err := s.repo.Save(ctx, shortID, originalURL)
+	savedURL, err := s.repo.Save(ctx, shortURL, originalURL)
+
 	if err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf("%s/%s", s.baseURL, shortID), nil
+	fmt.Println(savedURL)
+
+	return fmt.Sprintf("%s/%s", s.baseURL, savedURL.ShortURL), nil
 }
 
 func (s *urlService) GetOriginalURL(ctx context.Context, shortID string) (string, error) {
@@ -53,15 +56,15 @@ func (s *urlService) GetOriginalURL(ctx context.Context, shortID string) (string
 		return "", ErrEmptyShortID
 	}
 
-	url, err := s.repo.GetByID(ctx, shortID)
+	url, err := s.repo.GetByShortURL(ctx, shortID)
 	if errors.Is(err, repository.ErrURLNotFound) {
 		return "", ErrURLNotFound
 	}
 
-	return url, nil
+	return url.OriginalURL, nil
 }
 
-func (s *urlService) generateShortID() string {
+func (s *urlService) generateShortURL() string {
 	b := make([]byte, 6)
 	rand.Read(b)
 	return base64.URLEncoding.EncodeToString(b)[:8]

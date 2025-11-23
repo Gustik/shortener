@@ -10,9 +10,10 @@ import (
 )
 
 const (
-	defaultServerAddress = "localhost:8080"
-	defaultBaseURL       = "http://localhost:8080"
-	defaultLogLevel      = "info"
+	defaultServerAddress   = "localhost:8080"
+	defaultBaseURL         = "http://localhost:8080"
+	defaultFileStoragePath = "db.json"
+	defaultLogLevel        = "info"
 )
 
 type NetAddr struct {
@@ -46,9 +47,10 @@ func (n *NetAddr) Set(value string) error {
 }
 
 type Config struct {
-	ServerAddress NetAddr
-	BaseURL       string
-	LogLevel      string
+	ServerAddress   NetAddr
+	BaseURL         string
+	FileStoragePath string
+	LogLevel        string
 }
 
 func Load() *Config {
@@ -56,14 +58,17 @@ func Load() *Config {
 
 	cfg.ServerAddress.Set(defaultServerAddress)
 	cfg.BaseURL = defaultBaseURL
+	cfg.FileStoragePath = defaultFileStoragePath
 	cfg.LogLevel = defaultLogLevel
 
 	var serverAddrFlag string
 	var baseURLFlag string
-	var LogLevelFlag string
+	var fileStoragePathFlag string
+	var logLevelFlag string
 	flag.StringVar(&serverAddrFlag, "a", "", "адрес и порт сервера в формате host:port")
 	flag.StringVar(&baseURLFlag, "b", "", "базовый URL для сокращенных ссылок")
-	flag.StringVar(&LogLevelFlag, "l", "", "базовый URL для сокращенных ссылок")
+	flag.StringVar(&fileStoragePathFlag, "f", "", "путь файла данных")
+	flag.StringVar(&logLevelFlag, "l", "", "уровень логирования")
 	flag.Parse()
 
 	if serverAddrFlag != "" {
@@ -71,6 +76,12 @@ func Load() *Config {
 	}
 	if baseURLFlag != "" {
 		cfg.BaseURL = baseURLFlag
+	}
+	if fileStoragePathFlag != "" {
+		cfg.FileStoragePath = fileStoragePathFlag
+	}
+	if logLevelFlag != "" {
+		cfg.LogLevel = logLevelFlag
 	}
 
 	if envServerAddr := os.Getenv("SERVER_ADDRESS"); envServerAddr != "" {
@@ -82,11 +93,15 @@ func Load() *Config {
 	if envLogLevel := os.Getenv("LOG_LEVEL"); envLogLevel != "" {
 		cfg.LogLevel = envLogLevel
 	}
+	if fileStoragePath := os.Getenv("FILE_STORAGE_PATH"); fileStoragePath != "" {
+		cfg.FileStoragePath = fileStoragePath
+	}
 
 	log.Println("Конфигурация загружена")
 	log.Println("---")
 	log.Println("addr:", cfg.ServerAddress.String())
 	log.Println("baseURL:", cfg.BaseURL)
+	log.Println("fileStoragePath:", cfg.FileStoragePath)
 	log.Println("logLevel:", cfg.LogLevel)
 	log.Println("---")
 

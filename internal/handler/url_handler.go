@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/Gustik/shortener/internal/logger"
-	"github.com/Gustik/shortener/internal/models"
+	"github.com/Gustik/shortener/internal/model"
 	"github.com/Gustik/shortener/internal/service"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
@@ -52,7 +52,7 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 func (h *URLHandler) ShortenURLV2(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	var req models.Request
+	var req model.Request
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Failed to decode json", http.StatusBadRequest)
 		return
@@ -72,7 +72,7 @@ func (h *URLHandler) ShortenURLV2(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 
-	resp := models.Response{
+	resp := model.Response{
 		Result: shortURL,
 	}
 

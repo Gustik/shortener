@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/Gustik/shortener/internal/handler"
-	"github.com/Gustik/shortener/internal/models"
+	"github.com/Gustik/shortener/internal/model"
 	"github.com/Gustik/shortener/internal/repository"
 	"github.com/Gustik/shortener/internal/service"
 
@@ -140,7 +140,7 @@ func TestURLHandler_ShortenURLV2(t *testing.T) {
 
 			if tt.expectedBody != "" {
 				if tt.expectedCode == http.StatusCreated {
-					var resp models.Response
+					var resp model.Response
 					if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 						t.Fatal("Не удалось декодировать ответ")
 					}

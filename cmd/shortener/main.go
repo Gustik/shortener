@@ -15,7 +15,12 @@ func main() {
 
 	logger.Initialize(cfg.LogLevel)
 
-	repo := repository.NewInMemoryURLRepository()
+	// repo := repository.NewInMemoryURLRepository()
+	repo, err := repository.NewFileURLRepository(cfg.FileStoragePath)
+	if err != nil {
+		logger.Log.Sugar().Fatalf("Ошибка инициализации репозитория: %v", err)
+	}
+
 	svc := service.NewURLService(repo, cfg.BaseURL)
 	h := handler.NewURLHandler(svc)
 
