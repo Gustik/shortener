@@ -12,10 +12,11 @@ import (
 func SetupRoutes(handler *URLHandler) http.Handler {
 	r := chi.NewRouter()
 
-	r.Use(myMiddleware.RequestLogger) // логирование запросов
-	r.Use(middleware.Recoverer)       // восстановление после panic
-	r.Use(middleware.RequestID)       // ID для каждого запроса
-	r.Use(middleware.RealIP)          // получение реального IP
+	r.Use(myMiddleware.RequestLogger)
+	r.Use(myMiddleware.GzipMiddleware)
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
 
 	r.With(myMiddleware.ContentTypeMiddleware("text/plain")).Post("/", handler.ShortenURL)
 	r.With(myMiddleware.ContentTypeMiddleware("application/json")).Post("/api/shorten", handler.ShortenURLV2)
