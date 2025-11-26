@@ -71,32 +71,32 @@ func Load() *Config {
 	flag.StringVar(&logLevelFlag, "l", "", "уровень логирования")
 	flag.Parse()
 
-	if serverAddrFlag != "" {
-		cfg.ServerAddress.Set(serverAddrFlag)
-	}
-	if baseURLFlag != "" {
-		cfg.BaseURL = baseURLFlag
-	}
-	if fileStoragePathFlag != "" {
-		cfg.FileStoragePath = fileStoragePathFlag
-	}
-	if logLevelFlag != "" {
-		cfg.LogLevel = logLevelFlag
-	}
-
 	if envServerAddr, ok := os.LookupEnv("SERVER_ADDRESS"); ok {
 		cfg.ServerAddress.Set(envServerAddr)
-	}
-	if envBaseURL, ok := os.LookupEnv("BASE_URL"); ok {
-		cfg.BaseURL = envBaseURL
-	}
-	if envLogLevel, ok := os.LookupEnv("LOG_LEVEL"); ok {
-		cfg.LogLevel = envLogLevel
-	}
-	if fileStoragePath, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok {
-		cfg.FileStoragePath = fileStoragePath
+	} else if serverAddrFlag != "" {
+		cfg.ServerAddress.Set(serverAddrFlag)
 	}
 
+	cfg.BaseURL = getConfigValue("BASE_URL", baseURLFlag, defaultBaseURL)
+	cfg.FileStoragePath = getConfigValue("FILE_STORAGE_PATH", fileStoragePathFlag, defaultFileStoragePath)
+	cfg.LogLevel = getConfigValue("LOG_LEVEL", logLevelFlag, defaultLogLevel)
+
+	printConfigInfo(cfg)
+
+	return cfg
+}
+
+func getConfigValue(envKey, flagValue, defaultValue string) string {
+	if envValue, ok := os.LookupEnv(envKey); ok {
+		return envValue
+	}
+	if flagValue != "" {
+		return flagValue
+	}
+	return defaultValue
+}
+
+func printConfigInfo(cfg *Config) {
 	log.Println("Конфигурация загружена")
 	log.Println("---")
 	log.Println("addr:", cfg.ServerAddress.String())
@@ -104,6 +104,4 @@ func Load() *Config {
 	log.Println("fileStoragePath:", cfg.FileStoragePath)
 	log.Println("logLevel:", cfg.LogLevel)
 	log.Println("---")
-
-	return cfg
 }
