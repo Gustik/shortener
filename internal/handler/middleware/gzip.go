@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"go.uber.org/zap"
+
 	"github.com/Gustik/shortener/internal/logger"
 )
 
@@ -87,7 +89,7 @@ func (c compressReader) Read(p []byte) (n int, err error) {
 
 func (c *compressReader) Close() error {
 	if err := c.r.Close(); err != nil {
-		return fmt.Errorf("ошибка закрытия тела запроса: %w", err)
+		return fmt.Errorf("failed to close request body: %w", err)
 	}
 	return c.zr.Close()
 }
@@ -109,7 +111,7 @@ func GzipMiddleware(next http.Handler) http.Handler {
 		if sendsGzip {
 			cr, err := newCompressReader(r.Body)
 			if err != nil {
-				logger.Log.Error(err.Error())
+				logger.Log.Error("failed to create gzip reader for request body", zap.Error(err))
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}

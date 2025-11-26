@@ -40,7 +40,8 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		http.Error(w, "Failed to shorten URL", http.StatusInternalServerError)
+		logger.Log.Error("failed to shorten URL", zap.Error(err))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -65,7 +66,8 @@ func (h *URLHandler) ShortenURLV2(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		http.Error(w, "Failed to shorten URL", http.StatusInternalServerError)
+		logger.Log.Error("failed to shorten URL", zap.Error(err))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -91,7 +93,8 @@ func (h *URLHandler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		logger.Log.Error("failed to get original URL", zap.Error(err))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
