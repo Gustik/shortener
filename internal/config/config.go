@@ -84,16 +84,16 @@ func Load() *Config {
 		cfg.LogLevel = logLevelFlag
 	}
 
-	if envServerAddr := os.Getenv("SERVER_ADDRESS"); envServerAddr != "" {
+	if envServerAddr, ok := os.LookupEnv("SERVER_ADDRESS"); ok {
 		cfg.ServerAddress.Set(envServerAddr)
 	}
-	if envBaseURL := os.Getenv("BASE_URL"); envBaseURL != "" {
+	if envBaseURL, ok := os.LookupEnv("BASE_URL"); ok {
 		cfg.BaseURL = envBaseURL
 	}
-	if envLogLevel := os.Getenv("LOG_LEVEL"); envLogLevel != "" {
+	if envLogLevel, ok := os.LookupEnv("LOG_LEVEL"); ok {
 		cfg.LogLevel = envLogLevel
 	}
-	if fileStoragePath := os.Getenv("FILE_STORAGE_PATH"); fileStoragePath != "" {
+	if fileStoragePath, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok {
 		cfg.FileStoragePath = fileStoragePath
 	}
 
