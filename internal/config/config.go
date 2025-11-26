@@ -10,8 +10,14 @@ import (
 )
 
 const (
+	StorageMem  string = "mem"
+	StorageFile string = "file"
+)
+
+const (
 	defaultServerAddress   = "localhost:8080"
 	defaultBaseURL         = "http://localhost:8080"
+	defaultStorageType     = StorageFile
 	defaultFileStoragePath = "db.json"
 	defaultLogLevel        = "info"
 )
@@ -51,6 +57,15 @@ type Config struct {
 	BaseURL         string
 	FileStoragePath string
 	LogLevel        string
+	StorageType     string
+}
+
+type Flags struct {
+	ServerAddr      string
+	BaseURL         string
+	FileStoragePath string
+	LogLevel        string
+	StorageType     string
 }
 
 func Load() *Config {
@@ -60,30 +75,36 @@ func Load() *Config {
 	cfg.BaseURL = defaultBaseURL
 	cfg.FileStoragePath = defaultFileStoragePath
 	cfg.LogLevel = defaultLogLevel
+	cfg.StorageType = StorageFile
 
-	var serverAddrFlag string
-	var baseURLFlag string
-	var fileStoragePathFlag string
-	var logLevelFlag string
-	flag.StringVar(&serverAddrFlag, "a", "", "адрес и порт сервера в формате host:port")
-	flag.StringVar(&baseURLFlag, "b", "", "базовый URL для сокращенных ссылок")
-	flag.StringVar(&fileStoragePathFlag, "f", "", "путь файла данных")
-	flag.StringVar(&logLevelFlag, "l", "", "уровень логирования")
-	flag.Parse()
+	flags := parseFlags()
 
 	if envServerAddr, ok := os.LookupEnv("SERVER_ADDRESS"); ok {
 		cfg.ServerAddress.Set(envServerAddr)
-	} else if serverAddrFlag != "" {
-		cfg.ServerAddress.Set(serverAddrFlag)
+	} else if flags.ServerAddr != "" {
+		cfg.ServerAddress.Set(flags.ServerAddr)
 	}
 
-	cfg.BaseURL = getConfigValue("BASE_URL", baseURLFlag, defaultBaseURL)
-	cfg.FileStoragePath = getConfigValue("FILE_STORAGE_PATH", fileStoragePathFlag, defaultFileStoragePath)
-	cfg.LogLevel = getConfigValue("LOG_LEVEL", logLevelFlag, defaultLogLevel)
+	cfg.BaseURL = getConfigValue("BASE_URL", flags.BaseURL, defaultBaseURL)
+	cfg.FileStoragePath = getConfigValue("FILE_STORAGE_PATH", flags.FileStoragePath, defaultFileStoragePath)
+	cfg.LogLevel = getConfigValue("LOG_LEVEL", flags.LogLevel, defaultLogLevel)
+	cfg.StorageType = getConfigValue("STORAGE_TYPE", flags.StorageType, defaultStorageType)
 
 	printConfigInfo(cfg)
 
 	return cfg
+}
+
+func parseFlags() *Flags {
+	f := &Flags{}
+	flag.StringVar(&f.ServerAddr, "a", "", "адрес и порт сервера в формате host:port")
+	flag.StringVar(&f.BaseURL, "b", "", "базовый URL для сокращенных ссылок")
+	flag.StringVar(&f.FileStoragePath, "f", "", "путь файла данных")
+	flag.StringVar(&f.StorageType, "s", "", "тип хранилища")
+	flag.StringVar(&f.LogLevel, "l", "", "уровень логирования")
+	flag.Parse()
+
+	return f
 }
 
 func getConfigValue(envKey, flagValue, defaultValue string) string {
@@ -102,6 +123,7 @@ func printConfigInfo(cfg *Config) {
 	log.Println("addr:", cfg.ServerAddress.String())
 	log.Println("baseURL:", cfg.BaseURL)
 	log.Println("fileStoragePath:", cfg.FileStoragePath)
+	log.Println("storageType:", cfg.StorageType)
 	log.Println("logLevel:", cfg.LogLevel)
 	log.Println("---")
 }
