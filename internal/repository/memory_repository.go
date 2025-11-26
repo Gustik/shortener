@@ -11,7 +11,7 @@ import (
 )
 
 type InMemoryURLRepository struct {
-	mu   sync.RWMutex
+	mu   sync.Mutex
 	urls []model.URLRecord
 }
 
@@ -38,8 +38,8 @@ func (r *InMemoryURLRepository) Save(ctx context.Context, shortURL, originalURL 
 }
 
 func (r *InMemoryURLRepository) GetByShortURL(ctx context.Context, shortURL string) (*model.URLRecord, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	for i := range r.urls {
 		if r.urls[i].ShortURL == shortURL {
