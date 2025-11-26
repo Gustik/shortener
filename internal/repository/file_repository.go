@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 
@@ -39,6 +40,10 @@ func NewFileURLRepository(file *os.File) (*FileURLRepository, error) {
 
 func (r *FileURLRepository) Save(ctx context.Context, shortURL, originalURL string) (*model.URLRecord, error) {
 	record, err := r.InMemoryURLRepository.Save(ctx, shortURL, originalURL)
+	if errors.Is(err, ErrURLExists) {
+		return record, err
+	}
+
 	if err != nil {
 		return nil, err
 	}

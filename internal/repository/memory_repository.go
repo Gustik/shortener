@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/google/uuid"
@@ -26,7 +27,7 @@ func (r *InMemoryURLRepository) Save(ctx context.Context, shortURL, originalURL 
 
 	for i := range r.urls {
 		if r.urls[i].OriginalURL == originalURL {
-			return &r.urls[i], ErrURLExists
+			return &r.urls[i], fmt.Errorf("%s - %w", originalURL, ErrURLExists)
 		}
 	}
 

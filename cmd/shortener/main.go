@@ -38,7 +38,7 @@ func main() {
 		repo = repository.NewInMemoryURLRepository()
 	}
 
-	svc := service.NewURLService(repo, cfg.BaseURL)
+	svc := service.NewURLService(repo, cfg.BaseURL, logger)
 	h := handler.NewURLHandler(svc, logger)
 
 	router := handler.SetupRoutes(h)

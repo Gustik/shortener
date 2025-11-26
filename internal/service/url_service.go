@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/Gustik/shortener/internal/repository"
 )
 
@@ -24,12 +26,14 @@ type URLService interface {
 type urlService struct {
 	repo    repository.URLRepository
 	baseURL string
+	logger  *zap.Logger
 }
 
-func NewURLService(repo repository.URLRepository, baseURL string) URLService {
+func NewURLService(repo repository.URLRepository, baseURL string, logger *zap.Logger) URLService {
 	return &urlService{
 		repo:    repo,
 		baseURL: baseURL,
+		logger:  logger,
 	}
 }
 
@@ -41,6 +45,10 @@ func (s *urlService) ShortenURL(ctx context.Context, originalURL string) (string
 	shortURL := s.generateShortURL()
 
 	savedURL, err := s.repo.Save(ctx, shortURL, originalURL)
+	if errors.Is(err, repository.ErrURLExists) {
+		s.logger.Sugar().Infof("%s", err.Error())
+		return fmt.Sprintf("%s/%s", s.baseURL, savedURL.ShortURL), nil
+	}
 
 	if err != nil {
 		return "", err
