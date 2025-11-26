@@ -30,9 +30,10 @@ func (r *InMemoryURLRepository) Save(ctx context.Context, shortURL, originalURL 
 		}
 	}
 
-	r.urls = append(r.urls, model.URLRecord{UUID: uuid.New(), ShortURL: shortURL, OriginalURL: originalURL})
+	record := model.URLRecord{UUID: uuid.New(), ShortURL: shortURL, OriginalURL: originalURL}
+	r.urls = append(r.urls, record)
 
-	return nil, nil
+	return &record, nil
 }
 
 func (r *InMemoryURLRepository) GetByShortURL(ctx context.Context, shortURL string) (*model.URLRecord, error) {

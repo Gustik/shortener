@@ -4,123 +4,79 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"io"
 	"os"
-	"sync"
-
-	"github.com/google/uuid"
 
 	"github.com/Gustik/shortener/internal/model"
 )
 
 type FileURLRepository struct {
-	mu       sync.RWMutex
-	filePath string
+	InMemoryURLRepository
+	file   *os.File
+	writer *bufio.Writer
 }
 
-func NewFileURLRepository(filePath string) (*FileURLRepository, error) {
+func NewFileURLRepository(file *os.File) (*FileURLRepository, error) {
 	repo := &FileURLRepository{
-		filePath: filePath,
+		InMemoryURLRepository: *NewInMemoryURLRepository(),
+		file:                  file,
+		writer:                bufio.NewWriter(file),
 	}
 
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		file, err := os.Create(filePath)
-		if err != nil {
-			return nil, err
-		}
-		file.Close()
+	// Загружаем существующие данные построчно
+	if err := repo.loadFromFile(); err != nil {
+		return nil, err
+	}
+
+	// Переходим в конец файла для дальнейшей записи
+	_, err := file.Seek(0, io.SeekEnd)
+	if err != nil {
+		return nil, err
 	}
 
 	return repo, nil
 }
 
 func (r *FileURLRepository) Save(ctx context.Context, shortURL, originalURL string) (*model.URLRecord, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	exists, err := r.checkExists(shortURL)
+	record, err := r.InMemoryURLRepository.Save(ctx, shortURL, originalURL)
 	if err != nil {
 		return nil, err
 	}
-	if exists {
-		return nil, ErrURLExists
-	}
 
-	record := &model.URLRecord{
-		UUID:        uuid.New(),
-		ShortURL:    shortURL,
-		OriginalURL: originalURL,
-	}
-
-	if err := r.appendRecord(record); err != nil {
+	if err := r.appendToFile(record); err != nil {
 		return nil, err
 	}
 
-	return record, nil
+	return record, err
 }
 
-func (r *FileURLRepository) GetByShortURL(ctx context.Context, shortURL string) (*model.URLRecord, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	return r.findByShortURL(shortURL)
-}
-
-func (r *FileURLRepository) appendRecord(record *model.URLRecord) error {
-	file, err := os.OpenFile(r.filePath, os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
+// Загрузка данных из файла (каждая запись на отдельной строке)
+func (r *FileURLRepository) loadFromFile() error {
+	scanner := bufio.NewScanner(r.file)
+	for scanner.Scan() {
+		var record model.URLRecord
+		if err := json.Unmarshal(scanner.Bytes(), &record); err != nil {
+			return err
+		}
+		r.urls = append(r.urls, record)
 	}
-	defer file.Close()
+	return scanner.Err()
+}
 
+// Дописываем одну запись в конец файла
+func (r *FileURLRepository) appendToFile(record *model.URLRecord) error {
 	data, err := json.Marshal(record)
 	if err != nil {
 		return err
 	}
 
-	data = append(data, '\n')
-
-	_, err = file.Write(data)
-	return err
-}
-
-func (r *FileURLRepository) findByShortURL(shortURL string) (*model.URLRecord, error) {
-	file, err := os.Open(r.filePath)
-	if err != nil {
-		return nil, err
+	// Записываем JSON + перевод строки
+	if _, err := r.writer.Write(data); err != nil {
+		return err
 	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
-		}
-
-		var record model.URLRecord
-		if err := json.Unmarshal(line, &record); err != nil {
-			continue // пропускаем поврежденные строки
-		}
-
-		if record.ShortURL == shortURL {
-			return &record, nil
-		}
+	if err := r.writer.WriteByte('\n'); err != nil {
+		return err
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-
-	return nil, ErrURLNotFound
-}
-
-func (r *FileURLRepository) checkExists(shortURL string) (bool, error) {
-	_, err := r.findByShortURL(shortURL)
-	if err == ErrURLNotFound {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+	return r.writer.Flush()
 }

@@ -46,8 +46,6 @@ func (s *urlService) ShortenURL(ctx context.Context, originalURL string) (string
 		return "", err
 	}
 
-	fmt.Println(savedURL)
-
 	return fmt.Sprintf("%s/%s", s.baseURL, savedURL.ShortURL), nil
 }
 
