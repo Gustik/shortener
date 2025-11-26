@@ -8,8 +8,6 @@ import (
 	"strings"
 
 	"go.uber.org/zap"
-
-	"github.com/Gustik/shortener/internal/logger"
 )
 
 type compressWriter struct {
@@ -94,31 +92,33 @@ func (c *compressReader) Close() error {
 	return c.zr.Close()
 }
 
-func GzipMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ow := w
-		acceptEncoding := r.Header.Get("Accept-Encoding")
+func GzipMiddleware(logger *zap.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ow := w
+			acceptEncoding := r.Header.Get("Accept-Encoding")
 
-		supportsGzip := strings.Contains(acceptEncoding, "gzip")
-		if supportsGzip {
-			cw := newCompressWriter(w)
-			ow = cw
-			defer cw.Close()
-		}
-
-		contentEncoding := r.Header.Get("Content-Encoding")
-		sendsGzip := strings.Contains(contentEncoding, "gzip")
-		if sendsGzip {
-			cr, err := newCompressReader(r.Body)
-			if err != nil {
-				logger.Log.Error("failed to create gzip reader for request body", zap.Error(err))
-				w.WriteHeader(http.StatusInternalServerError)
-				return
+			supportsGzip := strings.Contains(acceptEncoding, "gzip")
+			if supportsGzip {
+				cw := newCompressWriter(w)
+				ow = cw
+				defer cw.Close()
 			}
-			r.Body = cr
-			defer cr.Close()
-		}
 
-		next.ServeHTTP(ow, r)
-	})
+			contentEncoding := r.Header.Get("Content-Encoding")
+			sendsGzip := strings.Contains(contentEncoding, "gzip")
+			if sendsGzip {
+				cr, err := newCompressReader(r.Body)
+				if err != nil {
+					logger.Error("failed to create gzip reader for request body", zap.Error(err))
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				r.Body = cr
+				defer cr.Close()
+			}
+
+			next.ServeHTTP(ow, r)
+		})
+	}
 }

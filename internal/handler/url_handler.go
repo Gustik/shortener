@@ -7,20 +7,22 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Gustik/shortener/internal/logger"
+	"go.uber.org/zap"
+
 	"github.com/Gustik/shortener/internal/model"
 	"github.com/Gustik/shortener/internal/service"
 	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
 )
 
 type URLHandler struct {
 	service service.URLService
+	logger  *zap.Logger
 }
 
-func NewURLHandler(service service.URLService) *URLHandler {
+func NewURLHandler(service service.URLService, logger *zap.Logger) *URLHandler {
 	return &URLHandler{
 		service: service,
+		logger:  logger,
 	}
 }
 
@@ -40,7 +42,7 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		logger.Log.Error("failed to shorten URL", zap.Error(err))
+		h.logger.Error("failed to shorten URL", zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -66,7 +68,7 @@ func (h *URLHandler) ShortenURLV2(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		logger.Log.Error("failed to shorten URL", zap.Error(err))
+		h.logger.Error("failed to shorten URL", zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -79,7 +81,7 @@ func (h *URLHandler) ShortenURLV2(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewEncoder(w).Encode(&resp); err != nil {
-		logger.Log.Error("failed to encode response", zap.Error(err))
+		h.logger.Error("failed to encode response", zap.Error(err))
 	}
 }
 
@@ -93,7 +95,7 @@ func (h *URLHandler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		logger.Log.Error("failed to get original URL", zap.Error(err))
+		h.logger.Error("failed to get original URL", zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}

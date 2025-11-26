@@ -12,8 +12,8 @@ import (
 func SetupRoutes(handler *URLHandler) http.Handler {
 	r := chi.NewRouter()
 
-	r.Use(myMiddleware.RequestLogger)
-	r.Use(myMiddleware.GzipMiddleware)
+	r.Use(myMiddleware.RequestLogger(handler.logger))
+	r.Use(myMiddleware.GzipMiddleware(handler.logger))
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)

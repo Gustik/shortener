@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Gustik/shortener/internal/zaplog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -41,7 +42,8 @@ func gunzip(data []byte) (string, error) {
 
 // Клиент поддерживает gzip + ответ 2xx с телом, сжимаем
 func TestGzipMiddleware_CompressResponse(t *testing.T) {
-	handler := GzipMiddleware(testHandler(http.StatusOK, "Hello, World!"))
+	middleware := GzipMiddleware(zaplog.NewNoop())
+	handler := middleware(testHandler(http.StatusOK, "Hello, World!"))
 
 	req := httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -60,7 +62,8 @@ func TestGzipMiddleware_CompressResponse(t *testing.T) {
 
 // Клиент не поддерживает gzip, не сжимаем
 func TestGzipMiddleware_NoCompressionWithoutAcceptEncoding(t *testing.T) {
-	handler := GzipMiddleware(testHandler(http.StatusOK, "Hello, World!"))
+	middleware := GzipMiddleware(zaplog.NewNoop())
+	handler := middleware(testHandler(http.StatusOK, "Hello, World!"))
 
 	req := httptest.NewRequest("GET", "/", nil)
 	// НЕ устанавливаем Accept-Encoding
@@ -80,7 +83,8 @@ func TestGzipMiddleware_NoCompressionForRedirect(t *testing.T) {
 		// не пишем тело
 	})
 
-	handler := GzipMiddleware(redirectHandler)
+	middleware := GzipMiddleware(zaplog.NewNoop())
+	handler := middleware(redirectHandler)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -95,7 +99,8 @@ func TestGzipMiddleware_NoCompressionForRedirect(t *testing.T) {
 
 // Ошибка 4xx с телом, сжимаем
 func TestGzipMiddleware_CompressionFor4xx(t *testing.T) {
-	handler := GzipMiddleware(testHandler(http.StatusNotFound, "Not Found"))
+	middleware := GzipMiddleware(zaplog.NewNoop())
+	handler := middleware(testHandler(http.StatusNotFound, "Not Found"))
 
 	req := httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -119,7 +124,8 @@ func TestGzipMiddleware_DecompressRequest(t *testing.T) {
 		w.Write(body)
 	})
 
-	handler := GzipMiddleware(echoHandler)
+	middleware := GzipMiddleware(zaplog.NewNoop())
+	handler := middleware(echoHandler)
 
 	// Создаём сжатое тело
 	var buf bytes.Buffer

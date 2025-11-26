@@ -13,6 +13,7 @@ import (
 	"github.com/Gustik/shortener/internal/model"
 	"github.com/Gustik/shortener/internal/repository"
 	"github.com/Gustik/shortener/internal/service"
+	"github.com/Gustik/shortener/internal/zaplog"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -56,7 +57,7 @@ func TestURLHandler_ShortenURL(t *testing.T) {
 
 	repo := repository.NewMockURLRepository()
 	service := service.NewURLService(repo, baseURL)
-	router := handler.SetupRoutes(handler.NewURLHandler(service))
+	router := handler.SetupRoutes(handler.NewURLHandler(service, zaplog.NewNoop()))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -125,7 +126,7 @@ func TestURLHandler_ShortenURLV2(t *testing.T) {
 
 	repo := repository.NewMockURLRepository()
 	service := service.NewURLService(repo, baseURL)
-	router := handler.SetupRoutes(handler.NewURLHandler(service))
+	router := handler.SetupRoutes(handler.NewURLHandler(service, zaplog.NewNoop()))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -182,7 +183,7 @@ func TestURLHandler_GetOriginalURL(t *testing.T) {
 
 	repo := repository.NewMockURLRepository()
 	service := service.NewURLService(repo, baseURL)
-	router := handler.SetupRoutes(handler.NewURLHandler(service))
+	router := handler.SetupRoutes(handler.NewURLHandler(service, zaplog.NewNoop()))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

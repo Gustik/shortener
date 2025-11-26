@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Gustik/shortener/internal/logger"
+	"go.uber.org/zap"
 )
 
 type (
@@ -30,26 +30,28 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	r.responseData.status = statusCode
 }
 
-func RequestLogger(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		responseData := &responseData{
-			status: 0,
-			size:   0,
-		}
-		lw := &loggingResponseWriter{
-			ResponseWriter: w,
-			responseData:   responseData,
-		}
-		next.ServeHTTP(lw, r)
-		duration := time.Since(start)
+func RequestLogger(logger *zap.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			responseData := &responseData{
+				status: 0,
+				size:   0,
+			}
+			lw := &loggingResponseWriter{
+				ResponseWriter: w,
+				responseData:   responseData,
+			}
+			next.ServeHTTP(lw, r)
+			duration := time.Since(start)
 
-		logger.Log.Sugar().Infoln(
-			"method", r.Method,
-			"path", r.URL.Path,
-			"status", responseData.status,
-			"size", responseData.size,
-			"duration", duration,
-		)
-	})
+			logger.Sugar().Infoln(
+				"method", r.Method,
+				"path", r.URL.Path,
+				"status", responseData.status,
+				"size", responseData.size,
+				"duration", duration,
+			)
+		})
+	}
 }
