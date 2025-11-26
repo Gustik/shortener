@@ -55,7 +55,7 @@ func TestURLHandler_ShortenURL(t *testing.T) {
 		},
 	}
 
-	repo := repository.NewMockURLRepository()
+	repo := repository.NewInMemoryURLRepository()
 	service := service.NewURLService(repo, baseURL, zaplog.NewNoop())
 	router := handler.SetupRoutes(handler.NewURLHandler(service, zaplog.NewNoop()))
 
@@ -124,7 +124,7 @@ func TestURLHandler_ShortenURLV2(t *testing.T) {
 		},
 	}
 
-	repo := repository.NewMockURLRepository()
+	repo := repository.NewInMemoryURLRepository()
 	service := service.NewURLService(repo, baseURL, zaplog.NewNoop())
 	router := handler.SetupRoutes(handler.NewURLHandler(service, zaplog.NewNoop()))
 
@@ -181,7 +181,7 @@ func TestURLHandler_GetOriginalURL(t *testing.T) {
 		},
 	}
 
-	repo := repository.NewMockURLRepository()
+	repo := repository.NewInMemoryURLRepository()
 	service := service.NewURLService(repo, baseURL, zaplog.NewNoop())
 	router := handler.SetupRoutes(handler.NewURLHandler(service, zaplog.NewNoop()))
 
