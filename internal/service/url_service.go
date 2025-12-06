@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/Gustik/shortener/internal/repository"
 )
 
@@ -24,12 +26,14 @@ type URLService interface {
 type urlService struct {
 	repo    repository.URLRepository
 	baseURL string
+	logger  *zap.Logger
 }
 
-func NewURLService(repo repository.URLRepository, baseURL string) URLService {
+func NewURLService(repo repository.URLRepository, baseURL string, logger *zap.Logger) URLService {
 	return &urlService{
 		repo:    repo,
 		baseURL: baseURL,
+		logger:  logger,
 	}
 }
 
@@ -38,14 +42,19 @@ func (s *urlService) ShortenURL(ctx context.Context, originalURL string) (string
 		return "", ErrEmptyURL
 	}
 
-	shortID := s.generateShortID()
+	shortURL := s.generateShortURL()
 
-	err := s.repo.Save(ctx, shortID, originalURL)
+	savedURL, err := s.repo.Save(ctx, shortURL, originalURL)
+	if errors.Is(err, repository.ErrURLExists) {
+		s.logger.Sugar().Infof("%s", err.Error())
+		return fmt.Sprintf("%s/%s", s.baseURL, savedURL.ShortURL), nil
+	}
+
 	if err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf("%s/%s", s.baseURL, shortID), nil
+	return fmt.Sprintf("%s/%s", s.baseURL, savedURL.ShortURL), nil
 }
 
 func (s *urlService) GetOriginalURL(ctx context.Context, shortID string) (string, error) {
@@ -53,15 +62,15 @@ func (s *urlService) GetOriginalURL(ctx context.Context, shortID string) (string
 		return "", ErrEmptyShortID
 	}
 
-	url, err := s.repo.GetByID(ctx, shortID)
+	url, err := s.repo.GetByShortURL(ctx, shortID)
 	if errors.Is(err, repository.ErrURLNotFound) {
 		return "", ErrURLNotFound
 	}
 
-	return url, nil
+	return url.OriginalURL, nil
 }
 
-func (s *urlService) generateShortID() string {
+func (s *urlService) generateShortURL() string {
 	b := make([]byte, 6)
 	rand.Read(b)
 	return base64.URLEncoding.EncodeToString(b)[:8]

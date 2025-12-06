@@ -10,8 +10,16 @@ import (
 )
 
 const (
-	defaultServerAddress = "localhost:8080"
-	defaultBaseURL       = "http://localhost:8080"
+	StorageMem  string = "mem"
+	StorageFile string = "file"
+)
+
+const (
+	defaultServerAddress   = "localhost:8080"
+	defaultBaseURL         = "http://localhost:8080"
+	defaultStorageType     = StorageFile
+	defaultFileStoragePath = "db.json"
+	defaultLogLevel        = "info"
 )
 
 type NetAddr struct {
@@ -45,37 +53,77 @@ func (n *NetAddr) Set(value string) error {
 }
 
 type Config struct {
-	ServerAddress NetAddr
-	BaseURL       string
+	ServerAddress   NetAddr
+	BaseURL         string
+	FileStoragePath string
+	LogLevel        string
+	StorageType     string
+}
+
+type Flags struct {
+	ServerAddr      string
+	BaseURL         string
+	FileStoragePath string
+	LogLevel        string
+	StorageType     string
 }
 
 func Load() *Config {
 	cfg := &Config{}
 
-	flag.Var(&cfg.ServerAddress, "a", "адрес и порт сервера в формате host:port")
-	flag.StringVar(&cfg.BaseURL, "b", "", "базовый URL для сокращенных ссылок")
-	flag.Parse()
+	cfg.ServerAddress.Set(defaultServerAddress)
+	cfg.BaseURL = defaultBaseURL
+	cfg.FileStoragePath = defaultFileStoragePath
+	cfg.LogLevel = defaultLogLevel
+	cfg.StorageType = StorageFile
 
-	if cfg.ServerAddress.String() == "" {
-		cfg.ServerAddress.Set(getEnv("SERVER_ADDRESS", defaultServerAddress))
+	flags := parseFlags()
+
+	if envServerAddr, ok := os.LookupEnv("SERVER_ADDRESS"); ok {
+		cfg.ServerAddress.Set(envServerAddr)
+	} else if flags.ServerAddr != "" {
+		cfg.ServerAddress.Set(flags.ServerAddr)
 	}
 
-	if cfg.BaseURL == "" {
-		cfg.BaseURL = getEnv("BASE_URL", defaultBaseURL)
-	}
+	cfg.BaseURL = getConfigValue("BASE_URL", flags.BaseURL, defaultBaseURL)
+	cfg.FileStoragePath = getConfigValue("FILE_STORAGE_PATH", flags.FileStoragePath, defaultFileStoragePath)
+	cfg.LogLevel = getConfigValue("LOG_LEVEL", flags.LogLevel, defaultLogLevel)
+	cfg.StorageType = getConfigValue("STORAGE_TYPE", flags.StorageType, defaultStorageType)
 
-	log.Println("Конфигурация загружена")
-	log.Println("---")
-	log.Println("addr:", cfg.ServerAddress.String())
-	log.Println("baseURL:", cfg.BaseURL)
-	log.Println("---")
+	printConfigInfo(cfg)
 
 	return cfg
 }
 
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
+func parseFlags() *Flags {
+	f := &Flags{}
+	flag.StringVar(&f.ServerAddr, "a", "", "адрес и порт сервера в формате host:port")
+	flag.StringVar(&f.BaseURL, "b", "", "базовый URL для сокращенных ссылок")
+	flag.StringVar(&f.FileStoragePath, "f", "", "путь файла данных")
+	flag.StringVar(&f.StorageType, "s", "", "тип хранилища")
+	flag.StringVar(&f.LogLevel, "l", "", "уровень логирования")
+	flag.Parse()
+
+	return f
+}
+
+func getConfigValue(envKey, flagValue, defaultValue string) string {
+	if envValue, ok := os.LookupEnv(envKey); ok {
+		return envValue
+	}
+	if flagValue != "" {
+		return flagValue
 	}
 	return defaultValue
+}
+
+func printConfigInfo(cfg *Config) {
+	log.Println("Конфигурация загружена")
+	log.Println("---")
+	log.Println("addr:", cfg.ServerAddress.String())
+	log.Println("baseURL:", cfg.BaseURL)
+	log.Println("fileStoragePath:", cfg.FileStoragePath)
+	log.Println("storageType:", cfg.StorageType)
+	log.Println("logLevel:", cfg.LogLevel)
+	log.Println("---")
 }
