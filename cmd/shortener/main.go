@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/Gustik/shortener/internal/config"
 	"github.com/Gustik/shortener/internal/handler"
@@ -24,7 +28,8 @@ func main() {
 
 	var repo repository.URLRepository
 
-	if cfg.StorageType == config.StorageFile {
+	switch cfg.StorageType {
+	case config.StorageFile:
 		file, err := os.OpenFile(cfg.FileStoragePath, os.O_RDWR|os.O_CREATE, 0666)
 		if err != nil {
 			log.Fatalf("Ошибка открытия файла репозитория: %v", err)
@@ -34,7 +39,16 @@ func main() {
 			logger.Sugar().Fatalf("Ошибка инициализации репозитория: %v", err)
 		}
 		defer file.Close()
-	} else {
+	case config.StorageSQL:
+		conn, err := pgx.Connect(context.Background(), cfg.DatabaseDSN)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
+			os.Exit(1)
+		}
+		defer conn.Close(context.Background())
+
+		repo, err = repository.NewSQLRepository(conn)
+	default:
 		repo = repository.NewInMemoryURLRepository()
 	}
 
@@ -44,6 +58,7 @@ func main() {
 	router := handler.SetupRoutes(h)
 
 	logger.Sugar().Infof("Запускаем сервер по адресу %s", cfg.ServerAddress.String())
+
 	if err := http.ListenAndServe(cfg.ServerAddress.String(), router); err != nil {
 		logger.Sugar().Fatalf("Ошибка при запуске: %v", err)
 	}

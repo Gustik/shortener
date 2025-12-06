@@ -12,13 +12,15 @@ import (
 const (
 	StorageMem  string = "mem"
 	StorageFile string = "file"
+	StorageSQL  string = "sql"
 )
 
 const (
 	defaultServerAddress   = "localhost:8080"
 	defaultBaseURL         = "http://localhost:8080"
-	defaultStorageType     = StorageFile
+	defaultStorageType     = StorageSQL
 	defaultFileStoragePath = "db.json"
+	defaultDatabaseDSN     = "postgres://postgres:secret@localhost:5432/shortener"
 	defaultLogLevel        = "info"
 )
 
@@ -58,6 +60,7 @@ type Config struct {
 	FileStoragePath string
 	LogLevel        string
 	StorageType     string
+	DatabaseDSN     string
 }
 
 type Flags struct {
@@ -66,6 +69,7 @@ type Flags struct {
 	FileStoragePath string
 	LogLevel        string
 	StorageType     string
+	DatabaseDSN     string
 }
 
 func Load() *Config {
@@ -74,6 +78,7 @@ func Load() *Config {
 	cfg.ServerAddress.Set(defaultServerAddress)
 	cfg.BaseURL = defaultBaseURL
 	cfg.FileStoragePath = defaultFileStoragePath
+	cfg.DatabaseDSN = defaultDatabaseDSN
 	cfg.LogLevel = defaultLogLevel
 	cfg.StorageType = StorageFile
 
@@ -89,6 +94,7 @@ func Load() *Config {
 	cfg.FileStoragePath = getConfigValue("FILE_STORAGE_PATH", flags.FileStoragePath, defaultFileStoragePath)
 	cfg.LogLevel = getConfigValue("LOG_LEVEL", flags.LogLevel, defaultLogLevel)
 	cfg.StorageType = getConfigValue("STORAGE_TYPE", flags.StorageType, defaultStorageType)
+	cfg.DatabaseDSN = getConfigValue("DATABASE_DSN", flags.DatabaseDSN, defaultDatabaseDSN)
 
 	printConfigInfo(cfg)
 
@@ -100,6 +106,7 @@ func parseFlags() *Flags {
 	flag.StringVar(&f.ServerAddr, "a", "", "адрес и порт сервера в формате host:port")
 	flag.StringVar(&f.BaseURL, "b", "", "базовый URL для сокращенных ссылок")
 	flag.StringVar(&f.FileStoragePath, "f", "", "путь файла данных")
+	flag.StringVar(&f.DatabaseDSN, "d", "", "DSN подключения к бд")
 	flag.StringVar(&f.StorageType, "s", "", "тип хранилища")
 	flag.StringVar(&f.LogLevel, "l", "", "уровень логирования")
 	flag.Parse()
@@ -123,6 +130,7 @@ func printConfigInfo(cfg *Config) {
 	log.Println("addr:", cfg.ServerAddress.String())
 	log.Println("baseURL:", cfg.BaseURL)
 	log.Println("fileStoragePath:", cfg.FileStoragePath)
+	log.Println("databaseDSN:", cfg.DatabaseDSN)
 	log.Println("storageType:", cfg.StorageType)
 	log.Println("logLevel:", cfg.LogLevel)
 	log.Println("---")
