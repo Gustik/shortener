@@ -70,6 +70,9 @@ func (r *FileURLRepository) loadFromFile() error {
 
 // Дописываем одну запись в конец файла
 func (r *FileURLRepository) appendToFile(record *model.URLRecord) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	data, err := json.Marshal(record)
 	if err != nil {
 		return err
