@@ -21,6 +21,7 @@ var (
 type URLService interface {
 	ShortenURL(ctx context.Context, originalURL string) (string, error)
 	GetOriginalURL(ctx context.Context, shortID string) (string, error)
+	Ping(ctx context.Context) error
 }
 
 type urlService struct {
@@ -68,6 +69,10 @@ func (s *urlService) GetOriginalURL(ctx context.Context, shortID string) (string
 	}
 
 	return url.OriginalURL, nil
+}
+
+func (s *urlService) Ping(ctx context.Context) error {
+	return s.repo.Ping(ctx)
 }
 
 func (s *urlService) generateShortURL() string {

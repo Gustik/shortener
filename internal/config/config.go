@@ -18,7 +18,7 @@ const (
 const (
 	defaultServerAddress   = "localhost:8080"
 	defaultBaseURL         = "http://localhost:8080"
-	defaultStorageType     = StorageSQL
+	defaultStorageType     = StorageFile
 	defaultFileStoragePath = "db.json"
 	defaultDatabaseDSN     = "postgres://postgres:secret@localhost:5432/shortener"
 	defaultLogLevel        = "info"

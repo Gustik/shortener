@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -48,6 +49,16 @@ func main() {
 		defer conn.Close(context.Background())
 
 		repo, err = repository.NewSQLRepository(conn)
+		if err != nil {
+			logger.Sugar().Fatalf("Ошибка инициализации репозитория: %v", err)
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := repo.Ping(ctx); err != nil {
+			logger.Sugar().Fatalf("Ошибка проверки подключения к БД: %v", err)
+		}
+		logger.Sugar().Info("Успешное подключение к PostgreSQL")
 	default:
 		repo = repository.NewInMemoryURLRepository()
 	}

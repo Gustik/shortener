@@ -49,3 +49,7 @@ func (r *InMemoryURLRepository) GetByShortURL(ctx context.Context, shortURL stri
 
 	return nil, ErrURLNotFound
 }
+
+func (r *InMemoryURLRepository) Ping(ctx context.Context) error {
+	return nil
+}

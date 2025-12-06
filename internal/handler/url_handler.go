@@ -104,6 +104,17 @@ func (h *URLHandler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
+func (h *URLHandler) Ping(w http.ResponseWriter, r *http.Request) {
+	err := h.service.Ping(r.Context())
+	if err != nil {
+		h.logger.Error("ping failed", zap.Error(err))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func GetShortID(path string) string {
 	return strings.TrimPrefix(path, "/")
 }

@@ -87,3 +87,7 @@ func (r SQLURLRepository) GetByOriginalURL(ctx context.Context, originalURL stri
 
 	return &record, nil
 }
+
+func (r SQLURLRepository) Ping(ctx context.Context) error {
+	return r.conn.Ping(ctx)
+}
