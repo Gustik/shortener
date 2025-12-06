@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 
@@ -61,7 +62,7 @@ func (r *FileURLRepository) loadFromFile() error {
 	for scanner.Scan() {
 		var record model.URLRecord
 		if err := json.Unmarshal(scanner.Bytes(), &record); err != nil {
-			return err
+			return fmt.Errorf("load url records: %w", err)
 		}
 		r.urls = append(r.urls, record)
 	}
@@ -75,16 +76,17 @@ func (r *FileURLRepository) appendToFile(record *model.URLRecord) error {
 
 	data, err := json.Marshal(record)
 	if err != nil {
-		return err
+		return fmt.Errorf("save url record: %w", err)
 	}
 
 	// Записываем JSON + перевод строки
+	data = append(data, '\n')
 	if _, err := r.writer.Write(data); err != nil {
-		return err
+		return fmt.Errorf("save url record: %w", err)
 	}
-	if err := r.writer.WriteByte('\n'); err != nil {
-		return err
+	if err := r.writer.Flush(); err != nil {
+		return fmt.Errorf("save url record: %w", err)
 	}
 
-	return r.writer.Flush()
+	return nil
 }
