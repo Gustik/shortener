@@ -2,12 +2,16 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Gustik/shortener/internal/config"
@@ -41,6 +45,11 @@ func main() {
 		}
 		defer file.Close()
 	case config.StorageSQL:
+		if err := runMigrations(cfg.DatabaseDSN); err != nil {
+			logger.Sugar().Fatalf("Ошибка применения миграций: %v", err)
+		}
+		logger.Sugar().Info("Миграции успешно применены")
+
 		conn, err := pgx.Connect(context.Background(), cfg.DatabaseDSN)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
@@ -73,4 +82,21 @@ func main() {
 	if err := http.ListenAndServe(cfg.ServerAddress.String(), router); err != nil {
 		logger.Sugar().Fatalf("Ошибка при запуске: %v", err)
 	}
+}
+
+func runMigrations(databaseDSN string) error {
+	m, err := migrate.New(
+		"file://migrations",
+		databaseDSN,
+	)
+	if err != nil {
+		return fmt.Errorf("ошибка создания migrate instance: %w", err)
+	}
+	defer m.Close()
+
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		return fmt.Errorf("ошибка применения миграций: %w", err)
+	}
+
+	return nil
 }
