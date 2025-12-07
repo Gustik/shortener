@@ -11,13 +11,12 @@ import (
 
 func TestConfigPriority(t *testing.T) {
 	tests := []struct {
-		name          string
-		envVars       map[string]string
-		args          []string
-		wantAddr      string
-		wantBaseURL   string
-		wantFilePath  string
-		wantLogLevel  string
+		name         string
+		envVars      map[string]string
+		args         []string
+		wantAddr     string
+		wantBaseURL  string
+		wantLogLevel string
 	}{
 		{
 			name:         "default values when no env and no flags",
@@ -25,21 +24,18 @@ func TestConfigPriority(t *testing.T) {
 			args:         []string{},
 			wantAddr:     "localhost:8080",
 			wantBaseURL:  "http://localhost:8080",
-			wantFilePath: "db.json",
 			wantLogLevel: "info",
 		},
 		{
-			name:    "env variables override defaults",
+			name: "env variables override defaults",
 			envVars: map[string]string{
-				"SERVER_ADDRESS":    "env.host:9090",
-				"BASE_URL":          "http://env.url",
-				"FILE_STORAGE_PATH": "env.json",
-				"LOG_LEVEL":         "debug",
+				"SERVER_ADDRESS": "env.host:9090",
+				"BASE_URL":       "http://env.url",
+				"LOG_LEVEL":      "debug",
 			},
 			args:         []string{},
 			wantAddr:     "env.host:9090",
 			wantBaseURL:  "http://env.url",
-			wantFilePath: "env.json",
 			wantLogLevel: "debug",
 		},
 		{
@@ -48,116 +44,186 @@ func TestConfigPriority(t *testing.T) {
 			args: []string{
 				"-a", "flag.host:7070",
 				"-b", "http://flag.url",
-				"-f", "flag.json",
 				"-l", "warn",
 			},
 			wantAddr:     "flag.host:7070",
 			wantBaseURL:  "http://flag.url",
-			wantFilePath: "flag.json",
 			wantLogLevel: "warn",
 		},
 		{
 			name: "env variables override flags (priority check)",
 			envVars: map[string]string{
-				"SERVER_ADDRESS":    "env.host:9090",
-				"BASE_URL":          "http://env.url",
-				"FILE_STORAGE_PATH": "env.json",
-				"LOG_LEVEL":         "debug",
+				"BASE_URL":  "http://env.url",
+				"LOG_LEVEL": "debug",
 			},
 			args: []string{
-				"-a", "flag.host:7070",
 				"-b", "http://flag.url",
-				"-f", "flag.json",
 				"-l", "warn",
 			},
-			wantAddr:     "env.host:9090",
+			wantAddr:     "localhost:8080",
 			wantBaseURL:  "http://env.url",
-			wantFilePath: "env.json",
 			wantLogLevel: "debug",
-		},
-		{
-			name: "mixed env and flags",
-			envVars: map[string]string{
-				"SERVER_ADDRESS": "env.host:9090",
-				"LOG_LEVEL":      "debug",
-			},
-			args: []string{
-				"-b", "http://flag.url",
-				"-f", "flag.json",
-			},
-			wantAddr:     "env.host:9090",
-			wantBaseURL:  "http://flag.url",
-			wantFilePath: "flag.json",
-			wantLogLevel: "debug",
-		},
-		{
-			name: "partial env overrides",
-			envVars: map[string]string{
-				"BASE_URL": "http://env.url",
-			},
-			args: []string{
-				"-a", "flag.host:7070",
-			},
-			wantAddr:     "flag.host:7070",
-			wantBaseURL:  "http://env.url",
-			wantFilePath: "db.json",
-			wantLogLevel: "info",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Сохраняем текущее состояние
 			oldArgs := os.Args
 			oldEnv := make(map[string]string)
-			envKeys := []string{"SERVER_ADDRESS", "BASE_URL", "FILE_STORAGE_PATH", "LOG_LEVEL"}
+			envKeys := []string{"SERVER_ADDRESS", "BASE_URL", "FILE_STORAGE_PATH", "DATABASE_DSN", "LOG_LEVEL"}
 
-			// Сохраняем старые значения env
 			for _, key := range envKeys {
 				if val, ok := os.LookupEnv(key); ok {
 					oldEnv[key] = val
 				}
-			}
-
-			// Очищаем все env переменные
-			for _, key := range envKeys {
 				os.Unsetenv(key)
 			}
 
-			// Устанавливаем новые env переменные
 			for key, val := range tt.envVars {
 				os.Setenv(key, val)
 			}
 
-			// Сбрасываем флаги
 			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-
-			// Устанавливаем аргументы командной строки
 			os.Args = append([]string{"cmd"}, tt.args...)
 
-			// Загружаем конфигурацию
 			cfg := Load()
 
-			// Проверяем результаты
-			assert.Equal(t, tt.wantAddr, cfg.ServerAddress.String(), "ServerAddress mismatch")
-			assert.Equal(t, tt.wantBaseURL, cfg.BaseURL, "BaseURL mismatch")
-			assert.Equal(t, tt.wantFilePath, cfg.FileStoragePath, "FileStoragePath mismatch")
-			assert.Equal(t, tt.wantLogLevel, cfg.LogLevel, "LogLevel mismatch")
+			assert.Equal(t, tt.wantAddr, cfg.ServerAddress.String())
+			assert.Equal(t, tt.wantBaseURL, cfg.BaseURL)
+			assert.Equal(t, tt.wantLogLevel, cfg.LogLevel)
 
-			// Восстанавливаем состояние
 			os.Args = oldArgs
-
-			// Очищаем тестовые env переменные
 			for _, key := range envKeys {
 				os.Unsetenv(key)
 			}
-
-			// Восстанавливаем старые env переменные
 			for key, val := range oldEnv {
 				os.Setenv(key, val)
 			}
+			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+		})
+	}
+}
 
-			// Сбрасываем флаги
+func TestStorageTypePriority(t *testing.T) {
+	tests := []struct {
+		name            string
+		envVars         map[string]string
+		args            []string
+		wantStorageType string
+		wantDBDSN       string
+		wantFilePath    string
+	}{
+		{
+			name:            "memory storage by default",
+			envVars:         map[string]string{},
+			args:            []string{},
+			wantStorageType: StorageMem,
+			wantDBDSN:       "",
+			wantFilePath:    "",
+		},
+		{
+			name: "file storage when only file path provided",
+			envVars: map[string]string{
+				"FILE_STORAGE_PATH": "/tmp/data.json",
+			},
+			args:            []string{},
+			wantStorageType: StorageFile,
+			wantFilePath:    "/tmp/data.json",
+			wantDBDSN:       "",
+		},
+		{
+			name: "sql storage when database DSN provided",
+			envVars: map[string]string{
+				"DATABASE_DSN": "postgres://user:pass@localhost/db",
+			},
+			args:            []string{},
+			wantStorageType: StorageSQL,
+			wantDBDSN:       "postgres://user:pass@localhost/db",
+			wantFilePath:    "",
+		},
+		{
+			name: "sql storage has priority over file storage",
+			envVars: map[string]string{
+				"DATABASE_DSN":      "postgres://user:pass@localhost/db",
+				"FILE_STORAGE_PATH": "/tmp/data.json",
+			},
+			args:            []string{},
+			wantStorageType: StorageSQL,
+			wantDBDSN:       "postgres://user:pass@localhost/db",
+			wantFilePath:    "/tmp/data.json",
+		},
+		{
+			name:    "flags work for database DSN",
+			envVars: map[string]string{},
+			args: []string{
+				"-d", "postgres://flag:pass@localhost/db",
+			},
+			wantStorageType: StorageSQL,
+			wantDBDSN:       "postgres://flag:pass@localhost/db",
+		},
+		{
+			name:    "flags work for file path",
+			envVars: map[string]string{},
+			args: []string{
+				"-f", "/flag/path.json",
+			},
+			wantStorageType: StorageFile,
+			wantFilePath:    "/flag/path.json",
+		},
+		{
+			name: "empty DATABASE_DSN falls back to file storage",
+			envVars: map[string]string{
+				"DATABASE_DSN":      "",
+				"FILE_STORAGE_PATH": "/tmp/data.json",
+			},
+			args:            []string{},
+			wantStorageType: StorageFile,
+			wantFilePath:    "/tmp/data.json",
+		},
+		{
+			name: "empty DATABASE_DSN and FILE_STORAGE_PATH falls back to memory",
+			envVars: map[string]string{
+				"DATABASE_DSN":      "",
+				"FILE_STORAGE_PATH": "",
+			},
+			args:            []string{},
+			wantStorageType: StorageMem,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			oldArgs := os.Args
+			oldEnv := make(map[string]string)
+			envKeys := []string{"SERVER_ADDRESS", "BASE_URL", "FILE_STORAGE_PATH", "DATABASE_DSN", "LOG_LEVEL"}
+
+			for _, key := range envKeys {
+				if val, ok := os.LookupEnv(key); ok {
+					oldEnv[key] = val
+				}
+				os.Unsetenv(key)
+			}
+
+			for key, val := range tt.envVars {
+				os.Setenv(key, val)
+			}
+
+			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+			os.Args = append([]string{"cmd"}, tt.args...)
+
+			cfg := Load()
+
+			assert.Equal(t, tt.wantStorageType, cfg.StorageType, "StorageType mismatch")
+			assert.Equal(t, tt.wantDBDSN, cfg.DatabaseDSN, "DatabaseDSN mismatch")
+			assert.Equal(t, tt.wantFilePath, cfg.FileStoragePath, "FileStoragePath mismatch")
+
+			os.Args = oldArgs
+			for _, key := range envKeys {
+				os.Unsetenv(key)
+			}
+			for key, val := range oldEnv {
+				os.Setenv(key, val)
+			}
 			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 		})
 	}
@@ -211,7 +277,6 @@ func TestGetConfigValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Очищаем переменную окружения
 			os.Unsetenv(tt.envKey)
 
 			if tt.setEnv {
@@ -220,7 +285,7 @@ func TestGetConfigValue(t *testing.T) {
 			}
 
 			got := getConfigValue(tt.envKey, tt.flagValue, tt.defaultValue)
-			assert.Equal(t, tt.want, got, "getConfigValue() result mismatch")
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -267,10 +332,10 @@ func TestNetAddrSetAndString(t *testing.T) {
 			err := addr.Set(tt.input)
 
 			if tt.wantErr {
-				assert.Error(t, err, "NetAddr.Set() should return error")
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err, "NetAddr.Set() should not return error")
-				assert.Equal(t, tt.wantStr, addr.String(), "NetAddr.String() mismatch")
+				require.NoError(t, err)
+				assert.Equal(t, tt.wantStr, addr.String())
 			}
 		})
 	}

@@ -16,12 +16,9 @@ const (
 )
 
 const (
-	defaultServerAddress   = "localhost:8080"
-	defaultBaseURL         = "http://localhost:8080"
-	defaultStorageType     = StorageFile
-	defaultFileStoragePath = "db.json"
-	defaultDatabaseDSN     = "postgres://postgres:secret@localhost:5432/shortener"
-	defaultLogLevel        = "info"
+	defaultServerAddress = "localhost:8080"
+	defaultBaseURL       = "http://localhost:8080"
+	defaultLogLevel      = "info"
 )
 
 type NetAddr struct {
@@ -57,18 +54,17 @@ func (n *NetAddr) Set(value string) error {
 type Config struct {
 	ServerAddress   NetAddr
 	BaseURL         string
-	FileStoragePath string
 	LogLevel        string
-	StorageType     string
+	FileStoragePath string
 	DatabaseDSN     string
+	StorageType     string
 }
 
 type Flags struct {
 	ServerAddr      string
 	BaseURL         string
-	FileStoragePath string
 	LogLevel        string
-	StorageType     string
+	FileStoragePath string
 	DatabaseDSN     string
 }
 
@@ -77,10 +73,8 @@ func Load() *Config {
 
 	cfg.ServerAddress.Set(defaultServerAddress)
 	cfg.BaseURL = defaultBaseURL
-	cfg.FileStoragePath = defaultFileStoragePath
-	cfg.DatabaseDSN = defaultDatabaseDSN
 	cfg.LogLevel = defaultLogLevel
-	cfg.StorageType = StorageFile
+	cfg.StorageType = StorageMem
 
 	flags := parseFlags()
 
@@ -91,10 +85,16 @@ func Load() *Config {
 	}
 
 	cfg.BaseURL = getConfigValue("BASE_URL", flags.BaseURL, defaultBaseURL)
-	cfg.FileStoragePath = getConfigValue("FILE_STORAGE_PATH", flags.FileStoragePath, defaultFileStoragePath)
 	cfg.LogLevel = getConfigValue("LOG_LEVEL", flags.LogLevel, defaultLogLevel)
-	cfg.StorageType = getConfigValue("STORAGE_TYPE", flags.StorageType, defaultStorageType)
-	cfg.DatabaseDSN = getConfigValue("DATABASE_DSN", flags.DatabaseDSN, defaultDatabaseDSN)
+
+	cfg.FileStoragePath = getConfigValue("FILE_STORAGE_PATH", flags.FileStoragePath, "")
+	cfg.DatabaseDSN = getConfigValue("DATABASE_DSN", flags.DatabaseDSN, "")
+
+	if cfg.DatabaseDSN != "" {
+		cfg.StorageType = StorageSQL
+	} else if cfg.FileStoragePath != "" {
+		cfg.StorageType = StorageFile
+	}
 
 	printConfigInfo(cfg)
 
@@ -107,7 +107,6 @@ func parseFlags() *Flags {
 	flag.StringVar(&f.BaseURL, "b", "", "базовый URL для сокращенных ссылок")
 	flag.StringVar(&f.FileStoragePath, "f", "", "путь файла данных")
 	flag.StringVar(&f.DatabaseDSN, "d", "", "DSN подключения к бд")
-	flag.StringVar(&f.StorageType, "s", "", "тип хранилища")
 	flag.StringVar(&f.LogLevel, "l", "", "уровень логирования")
 	flag.Parse()
 
@@ -129,9 +128,9 @@ func printConfigInfo(cfg *Config) {
 	log.Println("---")
 	log.Println("addr:", cfg.ServerAddress.String())
 	log.Println("baseURL:", cfg.BaseURL)
+	log.Println("logLevel:", cfg.LogLevel)
 	log.Println("fileStoragePath:", cfg.FileStoragePath)
 	log.Println("databaseDSN:", cfg.DatabaseDSN)
 	log.Println("storageType:", cfg.StorageType)
-	log.Println("logLevel:", cfg.LogLevel)
 	log.Println("---")
 }
