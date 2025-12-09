@@ -50,6 +50,34 @@ func (r *InMemoryURLRepository) GetByShortURL(ctx context.Context, shortURL stri
 	return nil, ErrURLNotFound
 }
 
+func (r *InMemoryURLRepository) SaveBatch(ctx context.Context, records []model.URLRecord) ([]model.URLRecord, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	result := make([]model.URLRecord, len(records))
+
+	for i, record := range records {
+		// Проверяем, существует ли уже такой original_url
+		existingRecord := (*model.URLRecord)(nil)
+		for j := range r.urls {
+			if r.urls[j].OriginalURL == record.OriginalURL {
+				existingRecord = &r.urls[j]
+				break
+			}
+		}
+
+		if existingRecord != nil {
+			result[i] = *existingRecord
+		} else {
+			record.UUID = uuid.New()
+			r.urls = append(r.urls, record)
+			result[i] = record
+		}
+	}
+
+	return result, nil
+}
+
 func (r *InMemoryURLRepository) Ping(ctx context.Context) error {
 	return nil
 }

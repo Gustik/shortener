@@ -9,17 +9,20 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/Gustik/shortener/internal/model"
 	"github.com/Gustik/shortener/internal/repository"
 )
 
 var (
-	ErrEmptyURL     = errors.New("URL cannot be empty")
-	ErrEmptyShortID = errors.New("ShortID cannot be empty")
-	ErrURLNotFound  = errors.New("URL not found")
+	ErrEmptyURL      = errors.New("URL cannot be empty")
+	ErrEmptyURLBatch = errors.New("URL batch cannot be empty")
+	ErrEmptyShortID  = errors.New("ShortID cannot be empty")
+	ErrURLNotFound   = errors.New("URL not found")
 )
 
 type URLService interface {
 	ShortenURL(ctx context.Context, originalURL string) (string, error)
+	ShortenURLBatch(ctx context.Context, urls []model.BatchRequest) ([]model.BatchResponse, error)
 	GetOriginalURL(ctx context.Context, shortID string) (string, error)
 	Ping(ctx context.Context) error
 }
@@ -56,6 +59,41 @@ func (s *urlService) ShortenURL(ctx context.Context, originalURL string) (string
 	}
 
 	return fmt.Sprintf("%s/%s", s.baseURL, savedURL.ShortURL), nil
+}
+
+func (s *urlService) ShortenURLBatch(ctx context.Context, urls []model.BatchRequest) ([]model.BatchResponse, error) {
+	if len(urls) == 0 {
+		return nil, ErrEmptyURLBatch
+	}
+
+	// Подготавливаем записи для batch-сохранения
+	records := make([]model.URLRecord, len(urls))
+	for i := range urls {
+		if urls[i].OriginalURL == "" {
+			return nil, ErrEmptyURL
+		}
+		records[i] = model.URLRecord{
+			ShortURL:    s.generateShortURL(),
+			OriginalURL: urls[i].OriginalURL,
+		}
+	}
+
+	// Сохраняем все записи одной операцией (транзакция/один мьютекс)
+	savedRecords, err := s.repo.SaveBatch(ctx, records)
+	if err != nil {
+		return nil, err
+	}
+
+	// Формируем ответ
+	resp := make([]model.BatchResponse, len(urls))
+	for i := range savedRecords {
+		resp[i] = model.BatchResponse{
+			CorrelationID: urls[i].CorrelationID,
+			ShortURL:      fmt.Sprintf("%s/%s", s.baseURL, savedRecords[i].ShortURL),
+		}
+	}
+
+	return resp, nil
 }
 
 func (s *urlService) GetOriginalURL(ctx context.Context, shortID string) (string, error) {

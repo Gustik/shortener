@@ -85,6 +85,35 @@ func (h *URLHandler) ShortenURLV2(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h *URLHandler) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	var req []model.BatchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Failed to decode json", http.StatusBadRequest)
+		return
+	}
+
+	resp, err := h.service.ShortenURLBatch(r.Context(), req)
+	if errors.Is(err, service.ErrEmptyURLBatch) {
+		http.Error(w, "URL batch cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	if err != nil {
+		h.logger.Error("failed to shorten URL batch", zap.Error(err))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	if err := json.NewEncoder(w).Encode(&resp); err != nil {
+		h.logger.Error("failed to encode response", zap.Error(err))
+	}
+}
+
 func (h *URLHandler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
 	shortID := chi.URLParam(r, "id")
 

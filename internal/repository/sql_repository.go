@@ -51,6 +51,41 @@ func (r SQLURLRepository) Save(ctx context.Context, shortURL, originalURL string
 	return &record, nil
 }
 
+func (r SQLURLRepository) SaveBatch(ctx context.Context, records []model.URLRecord) ([]model.URLRecord, error) {
+	tx, err := r.conn.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка начала транзакции: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	result := make([]model.URLRecord, len(records))
+
+	for i, record := range records {
+		query := `
+			INSERT INTO urls (short_url, original_url)
+			VALUES ($1, $2)
+			ON CONFLICT (original_url) DO UPDATE SET original_url = EXCLUDED.original_url
+			RETURNING id, short_url, original_url
+		`
+
+		err := tx.QueryRow(ctx, query, record.ShortURL, record.OriginalURL).Scan(
+			&result[i].UUID,
+			&result[i].ShortURL,
+			&result[i].OriginalURL,
+		)
+
+		if err != nil {
+			return nil, fmt.Errorf("ошибка сохранения URL %s: %w", record.OriginalURL, err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("ошибка коммита транзакции: %w", err)
+	}
+
+	return result, nil
+}
+
 func (r SQLURLRepository) GetByShortURL(ctx context.Context, shortURL string) (*model.URLRecord, error) {
 	query := `SELECT id, short_url, original_url FROM urls WHERE short_url = $1`
 
