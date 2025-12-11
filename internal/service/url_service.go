@@ -13,11 +13,15 @@ import (
 	"github.com/Gustik/shortener/internal/repository"
 )
 
+const maxSaveRetries = 5
+
 var (
-	ErrEmptyURL      = errors.New("URL cannot be empty")
-	ErrEmptyURLBatch = errors.New("URL batch cannot be empty")
-	ErrEmptyShortID  = errors.New("ShortID cannot be empty")
-	ErrURLNotFound   = errors.New("URL not found")
+	ErrEmptyURL           = errors.New("URL cannot be empty")
+	ErrEmptyURLBatch      = errors.New("URL batch cannot be empty")
+	ErrEmptyShortID       = errors.New("ShortID cannot be empty")
+	ErrURLNotFound        = errors.New("URL not found")
+	ErrURLExists          = errors.New("URL already exists")
+	ErrMaxRetriesExceeded = errors.New("maximum retry attempts exceeded for generating unique short URL")
 )
 
 type URLService interface {
@@ -46,19 +50,30 @@ func (s *urlService) ShortenURL(ctx context.Context, originalURL string) (string
 		return "", ErrEmptyURL
 	}
 
-	shortURL := s.generateShortURL()
+	for range maxSaveRetries {
+		shortURL := s.generateShortURL()
 
-	savedURL, err := s.repo.Save(ctx, shortURL, originalURL)
-	if errors.Is(err, repository.ErrURLExists) {
-		s.logger.Sugar().Infof("%s", err.Error())
+		savedURL, err := s.repo.Save(ctx, shortURL, originalURL)
+		if errors.Is(err, repository.ErrURLConflict) {
+			s.logger.Sugar().Infof("%s", err.Error())
+			return fmt.Sprintf("%s/%s", s.baseURL, savedURL.ShortURL), ErrURLExists
+		}
+
+		if errors.Is(err, repository.ErrShortURLConflict) {
+			s.logger.Sugar().Infof("%s", err.Error())
+			continue
+		}
+
+		if err != nil {
+			return "", err
+		}
+
 		return fmt.Sprintf("%s/%s", s.baseURL, savedURL.ShortURL), nil
 	}
 
-	if err != nil {
-		return "", err
-	}
+	s.logger.Sugar().Errorf("не удалось сгенерировать уникальный short_url после %d попыток", maxSaveRetries)
 
-	return fmt.Sprintf("%s/%s", s.baseURL, savedURL.ShortURL), nil
+	return "", ErrMaxRetriesExceeded
 }
 
 func (s *urlService) ShortenURLBatch(ctx context.Context, urls []model.BatchRequest) ([]model.BatchResponse, error) {
@@ -66,7 +81,6 @@ func (s *urlService) ShortenURLBatch(ctx context.Context, urls []model.BatchRequ
 		return nil, ErrEmptyURLBatch
 	}
 
-	// Подготавливаем записи для batch-сохранения
 	records := make([]model.URLRecord, len(urls))
 	for i := range urls {
 		if urls[i].OriginalURL == "" {
@@ -78,13 +92,11 @@ func (s *urlService) ShortenURLBatch(ctx context.Context, urls []model.BatchRequ
 		}
 	}
 
-	// Сохраняем все записи одной операцией (транзакция/один мьютекс)
 	savedRecords, err := s.repo.SaveBatch(ctx, records)
 	if err != nil {
 		return nil, err
 	}
 
-	// Формируем ответ
 	resp := make([]model.BatchResponse, len(urls))
 	for i := range savedRecords {
 		resp[i] = model.BatchResponse{

@@ -8,8 +8,9 @@ import (
 )
 
 var (
-	ErrURLNotFound = errors.New("URL not found")
-	ErrURLExists   = errors.New("URL already exists")
+	ErrURLNotFound      = errors.New("URL not found")
+	ErrURLConflict      = errors.New("URL already exists")
+	ErrShortURLConflict = errors.New("short URL already exists")
 )
 
 type URLRepository interface {

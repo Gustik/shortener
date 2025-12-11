@@ -41,14 +41,17 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err != nil {
+	if errors.Is(err, service.ErrURLExists) {
+		w.WriteHeader(http.StatusConflict)
+	} else if err != nil {
 		h.logger.Error("failed to shorten URL", zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
+	} else {
+		w.WriteHeader(http.StatusCreated)
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortURL))
 }
 
@@ -67,14 +70,17 @@ func (h *URLHandler) ShortenURLV2(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err != nil {
+	w.Header().Set("Content-Type", "application/json")
+
+	if errors.Is(err, service.ErrURLExists) {
+		w.WriteHeader(http.StatusConflict)
+	} else if err != nil {
 		h.logger.Error("failed to shorten URL", zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
+	} else {
+		w.WriteHeader(http.StatusCreated)
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
 
 	resp := model.Response{
 		Result: shortURL,
