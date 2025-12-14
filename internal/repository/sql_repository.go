@@ -43,7 +43,7 @@ func (r SQLURLRepository) Save(ctx context.Context, shortURL, originalURL string
 		// Если INSERT был пропущен из-за конфликта по original_url, RETURNING ничего не вернёт
 		if err == pgx.ErrNoRows {
 			// Получаем существующую запись
-			existsURL, err := r.GetByOriginalURL(ctx, originalURL)
+			existsURL, err := r.getByOriginalURL(ctx, originalURL)
 			if err != nil {
 				return nil, err
 			}
@@ -128,7 +128,7 @@ func (r SQLURLRepository) GetByShortURL(ctx context.Context, shortURL string) (*
 	return &record, nil
 }
 
-func (r SQLURLRepository) GetByOriginalURL(ctx context.Context, originalURL string) (*model.URLRecord, error) {
+func (r SQLURLRepository) getByOriginalURL(ctx context.Context, originalURL string) (*model.URLRecord, error) {
 	query := `SELECT id, short_url, original_url FROM urls WHERE original_url = $1`
 
 	var record model.URLRecord
