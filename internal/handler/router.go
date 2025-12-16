@@ -20,7 +20,9 @@ func SetupRoutes(handler *URLHandler) http.Handler {
 
 	r.With(myMiddleware.ContentTypeMiddleware("text/plain")).Post("/", handler.ShortenURL)
 	r.With(myMiddleware.ContentTypeMiddleware("application/json")).Post("/api/shorten", handler.ShortenURLV2)
+	r.With(myMiddleware.ContentTypeMiddleware("application/json")).Post("/api/shorten/batch", handler.ShortenURLBatch)
 	r.Get("/{id}", handler.GetOriginalURL)
+	r.Get("/ping", handler.Ping)
 
 	return r
 }

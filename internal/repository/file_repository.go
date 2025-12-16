@@ -41,7 +41,7 @@ func NewFileURLRepository(file *os.File) (*FileURLRepository, error) {
 
 func (r *FileURLRepository) Save(ctx context.Context, shortURL, originalURL string) (*model.URLRecord, error) {
 	record, err := r.InMemoryURLRepository.Save(ctx, shortURL, originalURL)
-	if errors.Is(err, ErrURLExists) {
+	if errors.Is(err, ErrURLConflict) {
 		return record, err
 	}
 
@@ -54,6 +54,47 @@ func (r *FileURLRepository) Save(ctx context.Context, shortURL, originalURL stri
 	}
 
 	return record, err
+}
+
+func (r *FileURLRepository) SaveBatch(ctx context.Context, records []model.URLRecord) ([]model.URLRecord, error) {
+	// Используем SaveBatch из InMemoryURLRepository для обновления памяти
+	result, err := r.InMemoryURLRepository.SaveBatch(ctx, records)
+	if err != nil {
+		return nil, err
+	}
+
+	// Записываем все новые записи в файл одним блоком
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for i := range result {
+		// Проверяем, была ли запись реально добавлена (а не уже существовала)
+		isNew := false
+		for j := range records {
+			if records[j].ShortURL == result[i].ShortURL && records[j].OriginalURL == result[i].OriginalURL {
+				isNew = true
+				break
+			}
+		}
+
+		if isNew {
+			data, err := json.Marshal(&result[i])
+			if err != nil {
+				return nil, fmt.Errorf("save url record: %w", err)
+			}
+
+			data = append(data, '\n')
+			if _, err := r.writer.Write(data); err != nil {
+				return nil, fmt.Errorf("save url record: %w", err)
+			}
+		}
+	}
+
+	if err := r.writer.Flush(); err != nil {
+		return nil, fmt.Errorf("flush records: %w", err)
+	}
+
+	return result, nil
 }
 
 // Загрузка данных из файла (каждая запись на отдельной строке)

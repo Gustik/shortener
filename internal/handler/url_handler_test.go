@@ -154,6 +154,102 @@ func TestURLHandler_ShortenURLV2(t *testing.T) {
 	}
 }
 
+func TestURLHandler_ShortenURLBatch(t *testing.T) {
+	tests := []struct {
+		name         string
+		method       string
+		contentType  string
+		body         string
+		expectedCode int
+		expectedBody string
+		checkResult  bool
+	}{
+		{
+			name:        "Успешное создание batch URLs",
+			method:      http.MethodPost,
+			contentType: "application/json",
+			body: `[
+				{"correlation_id": "req-1", "original_url": "https://practicum.yandex.ru"},
+				{"correlation_id": "req-2", "original_url": "https://yandex.ru"},
+				{"correlation_id": "req-3", "original_url": "https://github.com"}
+			]`,
+			expectedCode: http.StatusCreated,
+			checkResult:  true,
+		},
+		{
+			name:         "Неправильный content type",
+			method:       http.MethodPost,
+			contentType:  "text/plain",
+			body:         `[{"correlation_id": "req-1", "original_url": "https://ya.ru"}]`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "Invalid content type",
+		},
+		{
+			name:         "Невалидный json",
+			method:       http.MethodPost,
+			contentType:  "application/json",
+			body:         "{invalid json",
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "Failed to decode json",
+		},
+		{
+			name:         "Пустой массив",
+			method:       http.MethodPost,
+			contentType:  "application/json",
+			body:         `[]`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "URL batch cannot be empty",
+		},
+		{
+			name:        "Один элемент в массиве",
+			method:      http.MethodPost,
+			contentType: "application/json",
+			body:        `[{"correlation_id": "single", "original_url": "https://example.com"}]`,
+			expectedCode: http.StatusCreated,
+			checkResult:  true,
+		},
+	}
+
+	repo := repository.NewInMemoryURLRepository()
+	service := service.NewURLService(repo, baseURL, zaplog.NewNoop())
+	router := handler.SetupRoutes(handler.NewURLHandler(service, zaplog.NewNoop()))
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := httptest.NewRequest(tt.method, "/api/shorten/batch", bytes.NewBufferString(tt.body))
+			r.Header.Set("Content-Type", tt.contentType)
+
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, r)
+
+			assert.Equal(t, tt.expectedCode, w.Code, "Код не тот что ждем")
+
+			if tt.checkResult && tt.expectedCode == http.StatusCreated {
+				var resp []model.BatchResponse
+				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+					t.Fatal("Не удалось декодировать ответ")
+				}
+
+				var req []model.BatchRequest
+				if err := json.Unmarshal([]byte(tt.body), &req); err != nil {
+					t.Fatal("Не удалось декодировать входной запрос")
+				}
+
+				assert.Equal(t, len(req), len(resp), "Количество элементов в ответе должно совпадать с запросом")
+
+				for i, item := range resp {
+					assert.Equal(t, req[i].CorrelationID, item.CorrelationID, "CorrelationID должен совпадать")
+					assert.True(t, strings.HasPrefix(item.ShortURL, baseURL), "ShortURL должен начинаться с baseURL")
+					assert.NotEmpty(t, item.ShortURL, "ShortURL не должен быть пустым")
+				}
+			} else if tt.expectedBody != "" {
+				assert.Contains(t, w.Body.String(), tt.expectedBody)
+			}
+		})
+	}
+}
+
 func TestURLHandler_GetOriginalURL(t *testing.T) {
 	tests := []struct {
 		name         string

@@ -41,14 +41,17 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err != nil {
+	if errors.Is(err, service.ErrURLExists) {
+		w.WriteHeader(http.StatusConflict)
+	} else if err != nil {
 		h.logger.Error("failed to shorten URL", zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
+	} else {
+		w.WriteHeader(http.StatusCreated)
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortURL))
 }
 
@@ -67,18 +70,50 @@ func (h *URLHandler) ShortenURLV2(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err != nil {
+	w.Header().Set("Content-Type", "application/json")
+
+	if errors.Is(err, service.ErrURLExists) {
+		w.WriteHeader(http.StatusConflict)
+	} else if err != nil {
 		h.logger.Error("failed to shorten URL", zap.Error(err))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	} else {
+		w.WriteHeader(http.StatusCreated)
+	}
+
+	resp := model.Response{
+		Result: shortURL,
+	}
+
+	if err := json.NewEncoder(w).Encode(&resp); err != nil {
+		h.logger.Error("failed to encode response", zap.Error(err))
+	}
+}
+
+func (h *URLHandler) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	var req []model.BatchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Failed to decode json", http.StatusBadRequest)
+		return
+	}
+
+	resp, err := h.service.ShortenURLBatch(r.Context(), req)
+	if errors.Is(err, service.ErrEmptyURLBatch) {
+		http.Error(w, "URL batch cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	if err != nil {
+		h.logger.Error("failed to shorten URL batch", zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-
-	resp := model.Response{
-		Result: shortURL,
-	}
 
 	if err := json.NewEncoder(w).Encode(&resp); err != nil {
 		h.logger.Error("failed to encode response", zap.Error(err))
@@ -102,6 +137,17 @@ func (h *URLHandler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Location", originalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func (h *URLHandler) Ping(w http.ResponseWriter, r *http.Request) {
+	err := h.service.Ping(r.Context())
+	if err != nil {
+		h.logger.Error("ping failed", zap.Error(err))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func GetShortID(path string) string {

@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/google/uuid"
@@ -26,8 +25,11 @@ func (r *InMemoryURLRepository) Save(ctx context.Context, shortURL, originalURL 
 	defer r.mu.Unlock()
 
 	for i := range r.urls {
+		if r.urls[i].ShortURL == shortURL {
+			return nil, ErrShortURLConflict
+		}
 		if r.urls[i].OriginalURL == originalURL {
-			return &r.urls[i], fmt.Errorf("%s - %w", originalURL, ErrURLExists)
+			return &r.urls[i], ErrURLConflict
 		}
 	}
 
@@ -48,4 +50,39 @@ func (r *InMemoryURLRepository) GetByShortURL(ctx context.Context, shortURL stri
 	}
 
 	return nil, ErrURLNotFound
+}
+
+func (r *InMemoryURLRepository) SaveBatch(ctx context.Context, records []model.URLRecord) ([]model.URLRecord, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	result := make([]model.URLRecord, len(records))
+
+	for i, record := range records {
+		// Проверяем, существует ли уже такой original_url
+		existingRecord := (*model.URLRecord)(nil)
+		for j := range r.urls {
+			if r.urls[j].ShortURL == record.ShortURL {
+				return nil, ErrShortURLConflict
+			}
+			if r.urls[j].OriginalURL == record.OriginalURL {
+				existingRecord = &r.urls[j]
+				break
+			}
+		}
+
+		if existingRecord != nil {
+			result[i] = *existingRecord
+		} else {
+			record.UUID = uuid.New()
+			r.urls = append(r.urls, record)
+			result[i] = record
+		}
+	}
+
+	return result, nil
+}
+
+func (r *InMemoryURLRepository) Ping(ctx context.Context) error {
+	return nil
 }

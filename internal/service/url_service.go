@@ -9,18 +9,26 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/Gustik/shortener/internal/model"
 	"github.com/Gustik/shortener/internal/repository"
 )
 
+const maxSaveRetries = 5
+
 var (
-	ErrEmptyURL     = errors.New("URL cannot be empty")
-	ErrEmptyShortID = errors.New("ShortID cannot be empty")
-	ErrURLNotFound  = errors.New("URL not found")
+	ErrEmptyURL           = errors.New("URL cannot be empty")
+	ErrEmptyURLBatch      = errors.New("URL batch cannot be empty")
+	ErrEmptyShortID       = errors.New("ShortID cannot be empty")
+	ErrURLNotFound        = errors.New("URL not found")
+	ErrURLExists          = errors.New("URL already exists")
+	ErrMaxRetriesExceeded = errors.New("maximum retry attempts exceeded for generating unique short URL")
 )
 
 type URLService interface {
 	ShortenURL(ctx context.Context, originalURL string) (string, error)
+	ShortenURLBatch(ctx context.Context, urls []model.BatchRequest) ([]model.BatchResponse, error)
 	GetOriginalURL(ctx context.Context, shortID string) (string, error)
+	Ping(ctx context.Context) error
 }
 
 type urlService struct {
@@ -42,19 +50,62 @@ func (s *urlService) ShortenURL(ctx context.Context, originalURL string) (string
 		return "", ErrEmptyURL
 	}
 
-	shortURL := s.generateShortURL()
+	for range maxSaveRetries {
+		shortURL := s.generateShortURL()
 
-	savedURL, err := s.repo.Save(ctx, shortURL, originalURL)
-	if errors.Is(err, repository.ErrURLExists) {
-		s.logger.Sugar().Infof("%s", err.Error())
+		savedURL, err := s.repo.Save(ctx, shortURL, originalURL)
+		if errors.Is(err, repository.ErrURLConflict) {
+			s.logger.Sugar().Infof("%s", err.Error())
+			return fmt.Sprintf("%s/%s", s.baseURL, savedURL.ShortURL), ErrURLExists
+		}
+
+		if errors.Is(err, repository.ErrShortURLConflict) {
+			s.logger.Sugar().Infof("%s", err.Error())
+			continue
+		}
+
+		if err != nil {
+			return "", err
+		}
+
 		return fmt.Sprintf("%s/%s", s.baseURL, savedURL.ShortURL), nil
 	}
 
-	if err != nil {
-		return "", err
+	s.logger.Sugar().Errorf("не удалось сгенерировать уникальный short_url после %d попыток", maxSaveRetries)
+
+	return "", ErrMaxRetriesExceeded
+}
+
+func (s *urlService) ShortenURLBatch(ctx context.Context, urls []model.BatchRequest) ([]model.BatchResponse, error) {
+	if len(urls) == 0 {
+		return nil, ErrEmptyURLBatch
 	}
 
-	return fmt.Sprintf("%s/%s", s.baseURL, savedURL.ShortURL), nil
+	records := make([]model.URLRecord, len(urls))
+	for i := range urls {
+		if urls[i].OriginalURL == "" {
+			return nil, ErrEmptyURL
+		}
+		records[i] = model.URLRecord{
+			ShortURL:    s.generateShortURL(),
+			OriginalURL: urls[i].OriginalURL,
+		}
+	}
+
+	savedRecords, err := s.repo.SaveBatch(ctx, records)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := make([]model.BatchResponse, len(urls))
+	for i := range savedRecords {
+		resp[i] = model.BatchResponse{
+			CorrelationID: urls[i].CorrelationID,
+			ShortURL:      fmt.Sprintf("%s/%s", s.baseURL, savedRecords[i].ShortURL),
+		}
+	}
+
+	return resp, nil
 }
 
 func (s *urlService) GetOriginalURL(ctx context.Context, shortID string) (string, error) {
@@ -68,6 +119,10 @@ func (s *urlService) GetOriginalURL(ctx context.Context, shortID string) (string
 	}
 
 	return url.OriginalURL, nil
+}
+
+func (s *urlService) Ping(ctx context.Context) error {
+	return s.repo.Ping(ctx)
 }
 
 func (s *urlService) generateShortURL() string {
