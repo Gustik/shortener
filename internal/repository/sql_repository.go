@@ -24,19 +24,20 @@ func NewSQLRepository(conn *pgx.Conn) (*SQLURLRepository, error) {
 	}, nil
 }
 
-func (r SQLURLRepository) Save(ctx context.Context, shortURL, originalURL string) (*model.URLRecord, error) {
+func (r SQLURLRepository) Save(ctx context.Context, shortURL, originalURL, userID string) (*model.URLRecord, error) {
 	query := `
-        INSERT INTO urls (short_url, original_url) 
-        VALUES ($1, $2)
+        INSERT INTO urls (short_url, original_url, user_id)
+        VALUES ($1, $2, $3)
         ON CONFLICT (original_url) DO NOTHING
-        RETURNING id, short_url, original_url
+        RETURNING id, short_url, original_url, user_id
     `
 
 	var record model.URLRecord
-	err := r.conn.QueryRow(ctx, query, shortURL, originalURL).Scan(
+	err := r.conn.QueryRow(ctx, query, shortURL, originalURL, userID).Scan(
 		&record.UUID,
 		&record.ShortURL,
 		&record.OriginalURL,
+		&record.UserID,
 	)
 
 	if err != nil {
@@ -76,16 +77,17 @@ func (r SQLURLRepository) SaveBatch(ctx context.Context, records []model.URLReco
 
 	for i, record := range records {
 		query := `
-			INSERT INTO urls (short_url, original_url)
-			VALUES ($1, $2)
+			INSERT INTO urls (short_url, original_url, user_id)
+			VALUES ($1, $2, $3)
 			ON CONFLICT (original_url) DO UPDATE SET original_url = EXCLUDED.original_url
-			RETURNING id, short_url, original_url
+			RETURNING id, short_url, original_url, user_id
 		`
 
-		err := tx.QueryRow(ctx, query, record.ShortURL, record.OriginalURL).Scan(
+		err := tx.QueryRow(ctx, query, record.ShortURL, record.OriginalURL, record.UserID).Scan(
 			&result[i].UUID,
 			&result[i].ShortURL,
 			&result[i].OriginalURL,
+			&result[i].UserID,
 		)
 
 		var pgErr *pgconn.PgError
@@ -109,13 +111,14 @@ func (r SQLURLRepository) SaveBatch(ctx context.Context, records []model.URLReco
 }
 
 func (r SQLURLRepository) GetByShortURL(ctx context.Context, shortURL string) (*model.URLRecord, error) {
-	query := `SELECT id, short_url, original_url FROM urls WHERE short_url = $1`
+	query := `SELECT id, short_url, original_url, user_id FROM urls WHERE short_url = $1`
 
 	var record model.URLRecord
 	err := r.conn.QueryRow(ctx, query, shortURL).Scan(
 		&record.UUID,
 		&record.ShortURL,
 		&record.OriginalURL,
+		&record.UserID,
 	)
 
 	if err != nil {
@@ -129,13 +132,14 @@ func (r SQLURLRepository) GetByShortURL(ctx context.Context, shortURL string) (*
 }
 
 func (r SQLURLRepository) getByOriginalURL(ctx context.Context, originalURL string) (*model.URLRecord, error) {
-	query := `SELECT id, short_url, original_url FROM urls WHERE original_url = $1`
+	query := `SELECT id, short_url, original_url, user_id FROM urls WHERE original_url = $1`
 
 	var record model.URLRecord
 	err := r.conn.QueryRow(ctx, query, originalURL).Scan(
 		&record.UUID,
 		&record.ShortURL,
 		&record.OriginalURL,
+		&record.UserID,
 	)
 
 	if err != nil {
@@ -143,6 +147,31 @@ func (r SQLURLRepository) getByOriginalURL(ctx context.Context, originalURL stri
 	}
 
 	return &record, nil
+}
+
+func (r SQLURLRepository) GetByUserID(ctx context.Context, userID string) ([]model.URLRecord, error) {
+	query := `SELECT id, short_url, original_url, user_id FROM urls WHERE user_id = $1`
+
+	rows, err := r.conn.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка получения URL пользователя: %w", err)
+	}
+	defer rows.Close()
+
+	var records []model.URLRecord
+	for rows.Next() {
+		var record model.URLRecord
+		if err := rows.Scan(&record.UUID, &record.ShortURL, &record.OriginalURL, &record.UserID); err != nil {
+			return nil, fmt.Errorf("ошибка сканирования записи: %w", err)
+		}
+		records = append(records, record)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("ошибка обработки строк: %w", err)
+	}
+
+	return records, nil
 }
 
 func (r SQLURLRepository) Ping(ctx context.Context) error {

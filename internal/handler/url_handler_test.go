@@ -18,7 +18,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const baseURL = "http://localhost:8080"
+const (
+	baseURL   = "http://localhost:8080"
+	jwtSecret = "test-secret-key"
+)
 
 func TestURLHandler_ShortenURL(t *testing.T) {
 	tests := []struct {
@@ -57,7 +60,7 @@ func TestURLHandler_ShortenURL(t *testing.T) {
 
 	repo := repository.NewInMemoryURLRepository()
 	service := service.NewURLService(repo, baseURL, zaplog.NewNoop())
-	router := handler.SetupRoutes(handler.NewURLHandler(service, zaplog.NewNoop()))
+	router := handler.SetupRoutes(handler.NewURLHandler(service, zaplog.NewNoop()), jwtSecret)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -126,7 +129,7 @@ func TestURLHandler_ShortenURLV2(t *testing.T) {
 
 	repo := repository.NewInMemoryURLRepository()
 	service := service.NewURLService(repo, baseURL, zaplog.NewNoop())
-	router := handler.SetupRoutes(handler.NewURLHandler(service, zaplog.NewNoop()))
+	router := handler.SetupRoutes(handler.NewURLHandler(service, zaplog.NewNoop()), jwtSecret)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -212,7 +215,7 @@ func TestURLHandler_ShortenURLBatch(t *testing.T) {
 
 	repo := repository.NewInMemoryURLRepository()
 	service := service.NewURLService(repo, baseURL, zaplog.NewNoop())
-	router := handler.SetupRoutes(handler.NewURLHandler(service, zaplog.NewNoop()))
+	router := handler.SetupRoutes(handler.NewURLHandler(service, zaplog.NewNoop()), jwtSecret)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -279,12 +282,12 @@ func TestURLHandler_GetOriginalURL(t *testing.T) {
 
 	repo := repository.NewInMemoryURLRepository()
 	service := service.NewURLService(repo, baseURL, zaplog.NewNoop())
-	router := handler.SetupRoutes(handler.NewURLHandler(service, zaplog.NewNoop()))
+	router := handler.SetupRoutes(handler.NewURLHandler(service, zaplog.NewNoop()), jwtSecret)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.expectedCode == http.StatusTemporaryRedirect {
-				repo.Save(context.Background(), strings.TrimPrefix(tt.path, "/"), tt.url)
+				repo.Save(context.Background(), strings.TrimPrefix(tt.path, "/"), tt.url, "test-user")
 			}
 
 			r := httptest.NewRequest(tt.method, tt.path, nil)

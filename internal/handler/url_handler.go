@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/Gustik/shortener/internal/handler/middleware"
 	"github.com/Gustik/shortener/internal/model"
 	"github.com/Gustik/shortener/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -29,13 +30,19 @@ func NewURLHandler(service service.URLService, logger *zap.Logger) *URLHandler {
 func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Failed to read body", http.StatusBadRequest)
 		return
 	}
 
-	shortURL, err := h.service.ShortenURL(r.Context(), strings.TrimSpace(string(body)))
+	shortURL, err := h.service.ShortenURL(r.Context(), strings.TrimSpace(string(body)), userID)
 	if errors.Is(err, service.ErrEmptyURL) {
 		http.Error(w, "URL cannot be empty", http.StatusBadRequest)
 		return
@@ -58,13 +65,19 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 func (h *URLHandler) ShortenURLV2(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	var req model.Request
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Failed to decode json", http.StatusBadRequest)
 		return
 	}
 
-	shortURL, err := h.service.ShortenURL(r.Context(), req.URL)
+	shortURL, err := h.service.ShortenURL(r.Context(), req.URL, userID)
 	if errors.Is(err, service.ErrEmptyURL) {
 		http.Error(w, "URL cannot be empty", http.StatusBadRequest)
 		return
@@ -94,13 +107,19 @@ func (h *URLHandler) ShortenURLV2(w http.ResponseWriter, r *http.Request) {
 func (h *URLHandler) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	var req []model.BatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Failed to decode json", http.StatusBadRequest)
 		return
 	}
 
-	resp, err := h.service.ShortenURLBatch(r.Context(), req)
+	resp, err := h.service.ShortenURLBatch(r.Context(), req, userID)
 	if errors.Is(err, service.ErrEmptyURLBatch) {
 		http.Error(w, "URL batch cannot be empty", http.StatusBadRequest)
 		return
@@ -137,6 +156,33 @@ func (h *URLHandler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Location", originalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func (h *URLHandler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	urls, err := h.service.GetUserURLs(r.Context(), userID)
+	if err != nil {
+		h.logger.Error("failed to get user URLs", zap.Error(err))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	if len(urls) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(urls); err != nil {
+		h.logger.Error("failed to encode response", zap.Error(err))
+	}
 }
 
 func (h *URLHandler) Ping(w http.ResponseWriter, r *http.Request) {

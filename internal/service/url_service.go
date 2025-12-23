@@ -25,9 +25,10 @@ var (
 )
 
 type URLService interface {
-	ShortenURL(ctx context.Context, originalURL string) (string, error)
-	ShortenURLBatch(ctx context.Context, urls []model.BatchRequest) ([]model.BatchResponse, error)
+	ShortenURL(ctx context.Context, originalURL, userID string) (string, error)
+	ShortenURLBatch(ctx context.Context, urls []model.BatchRequest, userID string) ([]model.BatchResponse, error)
 	GetOriginalURL(ctx context.Context, shortID string) (string, error)
+	GetUserURLs(ctx context.Context, userID string) ([]model.UserURLResponse, error)
 	Ping(ctx context.Context) error
 }
 
@@ -45,7 +46,7 @@ func NewURLService(repo repository.URLRepository, baseURL string, logger *zap.Lo
 	}
 }
 
-func (s *urlService) ShortenURL(ctx context.Context, originalURL string) (string, error) {
+func (s *urlService) ShortenURL(ctx context.Context, originalURL, userID string) (string, error) {
 	if originalURL == "" {
 		return "", ErrEmptyURL
 	}
@@ -53,7 +54,7 @@ func (s *urlService) ShortenURL(ctx context.Context, originalURL string) (string
 	for range maxSaveRetries {
 		shortURL := s.generateShortURL()
 
-		savedURL, err := s.repo.Save(ctx, shortURL, originalURL)
+		savedURL, err := s.repo.Save(ctx, shortURL, originalURL, userID)
 		if errors.Is(err, repository.ErrURLConflict) {
 			s.logger.Sugar().Infof("%s", err.Error())
 			return fmt.Sprintf("%s/%s", s.baseURL, savedURL.ShortURL), ErrURLExists
@@ -76,7 +77,7 @@ func (s *urlService) ShortenURL(ctx context.Context, originalURL string) (string
 	return "", ErrMaxRetriesExceeded
 }
 
-func (s *urlService) ShortenURLBatch(ctx context.Context, urls []model.BatchRequest) ([]model.BatchResponse, error) {
+func (s *urlService) ShortenURLBatch(ctx context.Context, urls []model.BatchRequest, userID string) ([]model.BatchResponse, error) {
 	if len(urls) == 0 {
 		return nil, ErrEmptyURLBatch
 	}
@@ -89,6 +90,7 @@ func (s *urlService) ShortenURLBatch(ctx context.Context, urls []model.BatchRequ
 		records[i] = model.URLRecord{
 			ShortURL:    s.generateShortURL(),
 			OriginalURL: urls[i].OriginalURL,
+			UserID:      userID,
 		}
 	}
 
@@ -119,6 +121,23 @@ func (s *urlService) GetOriginalURL(ctx context.Context, shortID string) (string
 	}
 
 	return url.OriginalURL, nil
+}
+
+func (s *urlService) GetUserURLs(ctx context.Context, userID string) ([]model.UserURLResponse, error) {
+	records, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]model.UserURLResponse, len(records))
+	for i, record := range records {
+		result[i] = model.UserURLResponse{
+			ShortURL:    fmt.Sprintf("%s/%s", s.baseURL, record.ShortURL),
+			OriginalURL: record.OriginalURL,
+		}
+	}
+
+	return result, nil
 }
 
 func (s *urlService) Ping(ctx context.Context) error {

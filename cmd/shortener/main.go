@@ -40,7 +40,7 @@ func main() {
 	svc := service.NewURLService(repo, cfg.BaseURL, logger)
 	h := handler.NewURLHandler(svc, logger)
 
-	router := handler.SetupRoutes(h)
+	router := handler.SetupRoutes(h, cfg.JWTSecret)
 
 	logger.Sugar().Infof("Запускаем сервер по адресу %s", cfg.ServerAddress.String())
 

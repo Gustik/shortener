@@ -39,8 +39,8 @@ func NewFileURLRepository(file *os.File) (*FileURLRepository, error) {
 	return repo, nil
 }
 
-func (r *FileURLRepository) Save(ctx context.Context, shortURL, originalURL string) (*model.URLRecord, error) {
-	record, err := r.InMemoryURLRepository.Save(ctx, shortURL, originalURL)
+func (r *FileURLRepository) Save(ctx context.Context, shortURL, originalURL, userID string) (*model.URLRecord, error) {
+	record, err := r.InMemoryURLRepository.Save(ctx, shortURL, originalURL, userID)
 	if errors.Is(err, ErrURLConflict) {
 		return record, err
 	}
