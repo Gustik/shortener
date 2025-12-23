@@ -20,7 +20,7 @@ func NewInMemoryURLRepository() *InMemoryURLRepository {
 	}
 }
 
-func (r *InMemoryURLRepository) Save(ctx context.Context, shortURL, originalURL string) (*model.URLRecord, error) {
+func (r *InMemoryURLRepository) Save(ctx context.Context, shortURL, originalURL, userID string) (*model.URLRecord, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -33,7 +33,7 @@ func (r *InMemoryURLRepository) Save(ctx context.Context, shortURL, originalURL 
 		}
 	}
 
-	record := model.URLRecord{UUID: uuid.New(), ShortURL: shortURL, OriginalURL: originalURL}
+	record := model.URLRecord{UUID: uuid.New(), ShortURL: shortURL, OriginalURL: originalURL, UserID: userID}
 	r.urls = append(r.urls, record)
 
 	return &record, nil
@@ -81,6 +81,20 @@ func (r *InMemoryURLRepository) SaveBatch(ctx context.Context, records []model.U
 	}
 
 	return result, nil
+}
+
+func (r *InMemoryURLRepository) GetByUserID(ctx context.Context, userID string) ([]model.URLRecord, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	var records []model.URLRecord
+	for i := range r.urls {
+		if r.urls[i].UserID == userID {
+			records = append(records, r.urls[i])
+		}
+	}
+
+	return records, nil
 }
 
 func (r *InMemoryURLRepository) Ping(ctx context.Context) error {
