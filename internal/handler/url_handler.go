@@ -148,6 +148,11 @@ func (h *URLHandler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if errors.Is(err, service.ErrURLDeleted) {
+		http.Error(w, "URL has been deleted", http.StatusGone)
+		return
+	}
+
 	if err != nil {
 		h.logger.Error("failed to get original URL", zap.Error(err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -183,6 +188,32 @@ func (h *URLHandler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(urls); err != nil {
 		h.logger.Error("failed to encode response", zap.Error(err))
 	}
+}
+
+func (h *URLHandler) DeleteUserURLs(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var shortURLs []string
+	if err := json.NewDecoder(r.Body).Decode(&shortURLs); err != nil {
+		http.Error(w, "Failed to decode json", http.StatusBadRequest)
+		return
+	}
+
+	if len(shortURLs) == 0 {
+		http.Error(w, "Empty URL list", http.StatusBadRequest)
+		return
+	}
+
+	// Асинхронное удаление
+	h.service.DeleteURLs(userID, shortURLs)
+
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (h *URLHandler) Ping(w http.ResponseWriter, r *http.Request) {

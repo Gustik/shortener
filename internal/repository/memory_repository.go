@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"slices"
 	"sync"
 
 	"github.com/google/uuid"
@@ -45,6 +46,9 @@ func (r *InMemoryURLRepository) GetByShortURL(ctx context.Context, shortURL stri
 
 	for i := range r.urls {
 		if r.urls[i].ShortURL == shortURL {
+			if r.urls[i].IsDeleted {
+				return nil, ErrURLDeleted
+			}
 			return &r.urls[i], nil
 		}
 	}
@@ -95,6 +99,22 @@ func (r *InMemoryURLRepository) GetByUserID(ctx context.Context, userID string) 
 	}
 
 	return records, nil
+}
+
+func (r *InMemoryURLRepository) DeleteURLs(ctx context.Context, shortURLs []string, userID string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for i := range r.urls {
+		if r.urls[i].UserID != userID {
+			continue
+		}
+		if slices.Contains(shortURLs, r.urls[i].ShortURL) {
+			r.urls[i].IsDeleted = true
+		}
+	}
+
+	return nil
 }
 
 func (r *InMemoryURLRepository) Ping(ctx context.Context) error {

@@ -111,7 +111,7 @@ func (r SQLURLRepository) SaveBatch(ctx context.Context, records []model.URLReco
 }
 
 func (r SQLURLRepository) GetByShortURL(ctx context.Context, shortURL string) (*model.URLRecord, error) {
-	query := `SELECT id, short_url, original_url, user_id FROM urls WHERE short_url = $1`
+	query := `SELECT id, short_url, original_url, user_id, is_deleted FROM urls WHERE short_url = $1`
 
 	var record model.URLRecord
 	err := r.conn.QueryRow(ctx, query, shortURL).Scan(
@@ -119,6 +119,7 @@ func (r SQLURLRepository) GetByShortURL(ctx context.Context, shortURL string) (*
 		&record.ShortURL,
 		&record.OriginalURL,
 		&record.UserID,
+		&record.IsDeleted,
 	)
 
 	if err != nil {
@@ -126,6 +127,10 @@ func (r SQLURLRepository) GetByShortURL(ctx context.Context, shortURL string) (*
 			return nil, ErrURLNotFound
 		}
 		return nil, fmt.Errorf("ошибка получения URL: %w", err)
+	}
+
+	if record.IsDeleted {
+		return nil, ErrURLDeleted
 	}
 
 	return &record, nil
@@ -172,6 +177,25 @@ func (r SQLURLRepository) GetByUserID(ctx context.Context, userID string) ([]mod
 	}
 
 	return records, nil
+}
+
+func (r SQLURLRepository) DeleteURLs(ctx context.Context, shortURLs []string, userID string) error {
+	if len(shortURLs) == 0 {
+		return nil
+	}
+
+	query := `
+		UPDATE urls
+		SET is_deleted = true
+		WHERE short_url = ANY($1) AND user_id = $2
+	`
+
+	_, err := r.conn.Exec(ctx, query, shortURLs, userID)
+	if err != nil {
+		return fmt.Errorf("ошибка удаления URL: %w", err)
+	}
+
+	return nil
 }
 
 func (r SQLURLRepository) Ping(ctx context.Context) error {

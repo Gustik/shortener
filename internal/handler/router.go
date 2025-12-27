@@ -24,6 +24,7 @@ func SetupRoutes(handler *URLHandler, jwtSecret string) http.Handler {
 	r.With(myMiddleware.ContentTypeMiddleware("application/json")).Post("/api/shorten/batch", handler.ShortenURLBatch)
 	r.Get("/{id}", handler.GetOriginalURL)
 	r.Get("/api/user/urls", handler.GetUserURLs)
+	r.With(myMiddleware.ContentTypeMiddleware("application/json")).Delete("/api/user/urls", handler.DeleteUserURLs)
 	r.Get("/ping", handler.Ping)
 
 	return r

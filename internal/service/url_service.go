@@ -6,14 +6,20 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"slices"
 
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/Gustik/shortener/internal/model"
 	"github.com/Gustik/shortener/internal/repository"
 )
 
-const maxSaveRetries = 5
+const (
+	maxSaveRetries       = 5
+	deleteBatchSize      = 10
+	deleteMaxConcurrency = 3
+)
 
 var (
 	ErrEmptyURL           = errors.New("URL cannot be empty")
@@ -21,6 +27,7 @@ var (
 	ErrEmptyShortID       = errors.New("ShortID cannot be empty")
 	ErrURLNotFound        = errors.New("URL not found")
 	ErrURLExists          = errors.New("URL already exists")
+	ErrURLDeleted         = errors.New("URL has been deleted")
 	ErrMaxRetriesExceeded = errors.New("maximum retry attempts exceeded for generating unique short URL")
 )
 
@@ -29,6 +36,7 @@ type URLService interface {
 	ShortenURLBatch(ctx context.Context, urls []model.BatchRequest, userID string) ([]model.BatchResponse, error)
 	GetOriginalURL(ctx context.Context, shortID string) (string, error)
 	GetUserURLs(ctx context.Context, userID string) ([]model.UserURLResponse, error)
+	DeleteURLs(userID string, shortURLs []string)
 	Ping(ctx context.Context) error
 }
 
@@ -119,6 +127,9 @@ func (s *urlService) GetOriginalURL(ctx context.Context, shortID string) (string
 	if errors.Is(err, repository.ErrURLNotFound) {
 		return "", ErrURLNotFound
 	}
+	if errors.Is(err, repository.ErrURLDeleted) {
+		return "", ErrURLDeleted
+	}
 
 	return url.OriginalURL, nil
 }
@@ -138,6 +149,31 @@ func (s *urlService) GetUserURLs(ctx context.Context, userID string) ([]model.Us
 	}
 
 	return result, nil
+}
+
+func (s *urlService) DeleteURLs(userID string, shortURLs []string) {
+	if len(shortURLs) == 0 {
+		return
+	}
+
+	go func() {
+		ctx := context.Background()
+		g := new(errgroup.Group)
+		semaphore := make(chan struct{}, deleteMaxConcurrency)
+
+		for batch := range slices.Chunk(shortURLs, deleteBatchSize) {
+			g.Go(func() error {
+				semaphore <- struct{}{}
+				defer func() { <-semaphore }()
+
+				return s.repo.DeleteURLs(ctx, batch, userID)
+			})
+		}
+
+		if err := g.Wait(); err != nil {
+			s.logger.Error("не удалось удалить пачкой урлы", zap.Error(err))
+		}
+	}()
 }
 
 func (s *urlService) Ping(ctx context.Context) error {
