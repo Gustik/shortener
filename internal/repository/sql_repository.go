@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Gustik/shortener/internal/model"
 )
@@ -15,12 +16,12 @@ import (
 const pgDuplicateErrorCode = "23505"
 
 type SQLURLRepository struct {
-	conn *pgx.Conn
+	pool *pgxpool.Pool
 }
 
-func NewSQLRepository(conn *pgx.Conn) (*SQLURLRepository, error) {
+func NewSQLRepository(pool *pgxpool.Pool) (*SQLURLRepository, error) {
 	return &SQLURLRepository{
-		conn: conn,
+		pool: pool,
 	}, nil
 }
 
@@ -33,7 +34,7 @@ func (r SQLURLRepository) Save(ctx context.Context, shortURL, originalURL, userI
     `
 
 	var record model.URLRecord
-	err := r.conn.QueryRow(ctx, query, shortURL, originalURL, userID).Scan(
+	err := r.pool.QueryRow(ctx, query, shortURL, originalURL, userID).Scan(
 		&record.UUID,
 		&record.ShortURL,
 		&record.OriginalURL,
@@ -68,7 +69,7 @@ func (r SQLURLRepository) Save(ctx context.Context, shortURL, originalURL, userI
 }
 
 func (r SQLURLRepository) SaveBatch(ctx context.Context, records []model.URLRecord) ([]model.URLRecord, error) {
-	tx, err := r.conn.Begin(ctx)
+	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка начала транзакции: %w", err)
 	}
@@ -116,7 +117,7 @@ func (r SQLURLRepository) GetByShortURL(ctx context.Context, shortURL string) (*
 	query := `SELECT id, short_url, original_url, user_id, is_deleted FROM urls WHERE short_url = $1`
 
 	var record model.URLRecord
-	err := r.conn.QueryRow(ctx, query, shortURL).Scan(
+	err := r.pool.QueryRow(ctx, query, shortURL).Scan(
 		&record.UUID,
 		&record.ShortURL,
 		&record.OriginalURL,
@@ -142,7 +143,7 @@ func (r SQLURLRepository) getByOriginalURL(ctx context.Context, originalURL stri
 	query := `SELECT id, short_url, original_url, user_id, is_deleted FROM urls WHERE original_url = $1`
 
 	var record model.URLRecord
-	err := r.conn.QueryRow(ctx, query, originalURL).Scan(
+	err := r.pool.QueryRow(ctx, query, originalURL).Scan(
 		&record.UUID,
 		&record.ShortURL,
 		&record.OriginalURL,
@@ -160,7 +161,7 @@ func (r SQLURLRepository) getByOriginalURL(ctx context.Context, originalURL stri
 func (r SQLURLRepository) GetByUserID(ctx context.Context, userID string) ([]model.URLRecord, error) {
 	query := `SELECT id, short_url, original_url, user_id, is_deleted FROM urls WHERE user_id = $1`
 
-	rows, err := r.conn.Query(ctx, query, userID)
+	rows, err := r.pool.Query(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка получения URL пользователя: %w", err)
 	}
@@ -193,7 +194,7 @@ func (r SQLURLRepository) DeleteURLs(ctx context.Context, shortURLs []string, us
 		WHERE short_url = ANY($1) AND user_id = $2
 	`
 
-	_, err := r.conn.Exec(ctx, query, shortURLs, userID)
+	_, err := r.pool.Exec(ctx, query, shortURLs, userID)
 	if err != nil {
 		return fmt.Errorf("ошибка удаления URL: %w", err)
 	}
@@ -202,5 +203,5 @@ func (r SQLURLRepository) DeleteURLs(ctx context.Context, shortURLs []string, us
 }
 
 func (r SQLURLRepository) Ping(ctx context.Context) error {
-	return r.conn.Ping(ctx)
+	return r.pool.Ping(ctx)
 }

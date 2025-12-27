@@ -11,7 +11,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/Gustik/shortener/internal/config"
@@ -97,30 +97,28 @@ func initSQLRepository(cfg *config.Config, logger *zap.Logger) (repository.URLRe
 	logger.Info("Миграции успешно применены")
 
 	logger.Info("Подключение к PostgreSQL")
-	conn, err := pgx.Connect(context.Background(), cfg.DatabaseDSN)
+	pool, err := pgxpool.New(context.Background(), cfg.DatabaseDSN)
 	if err != nil {
 		return nil, nil, fmt.Errorf("ошибка подключения к БД: %w", err)
 	}
 
-	repo, err := repository.NewSQLRepository(conn)
+	repo, err := repository.NewSQLRepository(pool)
 	if err != nil {
-		conn.Close(context.Background())
+		pool.Close()
 		return nil, nil, fmt.Errorf("ошибка инициализации SQL репозитория: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := repo.Ping(ctx); err != nil {
-		conn.Close(context.Background())
+		pool.Close()
 		return nil, nil, fmt.Errorf("ошибка проверки подключения к БД: %w", err)
 	}
 	logger.Info("Успешное подключение к PostgreSQL")
 
 	cleanup := func() {
 		logger.Info("Закрываю соединение с posgtres")
-		if err := conn.Close(context.Background()); err != nil {
-			logger.Error("Ошибка закрытия подключения к БД", zap.Error(err))
-		}
+		pool.Close()
 	}
 
 	return repo, cleanup, nil
