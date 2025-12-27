@@ -29,7 +29,7 @@ func (r SQLURLRepository) Save(ctx context.Context, shortURL, originalURL, userI
         INSERT INTO urls (short_url, original_url, user_id)
         VALUES ($1, $2, $3)
         ON CONFLICT (original_url) DO NOTHING
-        RETURNING id, short_url, original_url, user_id
+        RETURNING id, short_url, original_url, user_id, is_deleted
     `
 
 	var record model.URLRecord
@@ -38,6 +38,7 @@ func (r SQLURLRepository) Save(ctx context.Context, shortURL, originalURL, userI
 		&record.ShortURL,
 		&record.OriginalURL,
 		&record.UserID,
+		&record.IsDeleted,
 	)
 
 	if err != nil {
@@ -80,7 +81,7 @@ func (r SQLURLRepository) SaveBatch(ctx context.Context, records []model.URLReco
 			INSERT INTO urls (short_url, original_url, user_id)
 			VALUES ($1, $2, $3)
 			ON CONFLICT (original_url) DO UPDATE SET original_url = EXCLUDED.original_url
-			RETURNING id, short_url, original_url, user_id
+			RETURNING id, short_url, original_url, user_id, is_deleted
 		`
 
 		err := tx.QueryRow(ctx, query, record.ShortURL, record.OriginalURL, record.UserID).Scan(
@@ -88,6 +89,7 @@ func (r SQLURLRepository) SaveBatch(ctx context.Context, records []model.URLReco
 			&result[i].ShortURL,
 			&result[i].OriginalURL,
 			&result[i].UserID,
+			&result[i].IsDeleted,
 		)
 
 		var pgErr *pgconn.PgError
@@ -137,7 +139,7 @@ func (r SQLURLRepository) GetByShortURL(ctx context.Context, shortURL string) (*
 }
 
 func (r SQLURLRepository) getByOriginalURL(ctx context.Context, originalURL string) (*model.URLRecord, error) {
-	query := `SELECT id, short_url, original_url, user_id FROM urls WHERE original_url = $1`
+	query := `SELECT id, short_url, original_url, user_id, is_deleted FROM urls WHERE original_url = $1`
 
 	var record model.URLRecord
 	err := r.conn.QueryRow(ctx, query, originalURL).Scan(
@@ -145,6 +147,7 @@ func (r SQLURLRepository) getByOriginalURL(ctx context.Context, originalURL stri
 		&record.ShortURL,
 		&record.OriginalURL,
 		&record.UserID,
+		&record.IsDeleted,
 	)
 
 	if err != nil {
@@ -155,7 +158,7 @@ func (r SQLURLRepository) getByOriginalURL(ctx context.Context, originalURL stri
 }
 
 func (r SQLURLRepository) GetByUserID(ctx context.Context, userID string) ([]model.URLRecord, error) {
-	query := `SELECT id, short_url, original_url, user_id FROM urls WHERE user_id = $1`
+	query := `SELECT id, short_url, original_url, user_id, is_deleted FROM urls WHERE user_id = $1`
 
 	rows, err := r.conn.Query(ctx, query, userID)
 	if err != nil {
@@ -166,7 +169,7 @@ func (r SQLURLRepository) GetByUserID(ctx context.Context, userID string) ([]mod
 	var records []model.URLRecord
 	for rows.Next() {
 		var record model.URLRecord
-		if err := rows.Scan(&record.UUID, &record.ShortURL, &record.OriginalURL, &record.UserID); err != nil {
+		if err := rows.Scan(&record.UUID, &record.ShortURL, &record.OriginalURL, &record.UserID, &record.IsDeleted); err != nil {
 			return nil, fmt.Errorf("ошибка сканирования записи: %w", err)
 		}
 		records = append(records, record)
