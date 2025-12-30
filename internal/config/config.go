@@ -19,6 +19,7 @@ const (
 	defaultServerAddress = "localhost:8080"
 	defaultBaseURL       = "http://localhost:8080"
 	defaultLogLevel      = "info"
+	defaultJWTSecret     = "default-secret-key-change-in-production"
 )
 
 type NetAddr struct {
@@ -58,6 +59,7 @@ type Config struct {
 	FileStoragePath string
 	DatabaseDSN     string
 	StorageType     string
+	JWTSecret       string
 }
 
 type Flags struct {
@@ -66,6 +68,7 @@ type Flags struct {
 	LogLevel        string
 	FileStoragePath string
 	DatabaseDSN     string
+	JWTSecret       string
 }
 
 func Load() *Config {
@@ -86,6 +89,7 @@ func Load() *Config {
 
 	cfg.BaseURL = getConfigValue("BASE_URL", flags.BaseURL, defaultBaseURL)
 	cfg.LogLevel = getConfigValue("LOG_LEVEL", flags.LogLevel, defaultLogLevel)
+	cfg.JWTSecret = getConfigValue("JWT_SECRET", flags.JWTSecret, defaultJWTSecret)
 
 	cfg.FileStoragePath = getConfigValue("FILE_STORAGE_PATH", flags.FileStoragePath, "")
 	cfg.DatabaseDSN = getConfigValue("DATABASE_DSN", flags.DatabaseDSN, "")
@@ -108,6 +112,7 @@ func parseFlags() *Flags {
 	flag.StringVar(&f.FileStoragePath, "f", "", "путь файла данных")
 	flag.StringVar(&f.DatabaseDSN, "d", "", "DSN подключения к бд")
 	flag.StringVar(&f.LogLevel, "l", "", "уровень логирования")
+	flag.StringVar(&f.JWTSecret, "s", "", "секретный ключ для JWT")
 	flag.Parse()
 
 	return f

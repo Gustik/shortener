@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Gustik/shortener/internal/model"
 )
@@ -15,28 +16,30 @@ import (
 const pgDuplicateErrorCode = "23505"
 
 type SQLURLRepository struct {
-	conn *pgx.Conn
+	pool *pgxpool.Pool
 }
 
-func NewSQLRepository(conn *pgx.Conn) (*SQLURLRepository, error) {
+func NewSQLRepository(pool *pgxpool.Pool) (*SQLURLRepository, error) {
 	return &SQLURLRepository{
-		conn: conn,
+		pool: pool,
 	}, nil
 }
 
-func (r SQLURLRepository) Save(ctx context.Context, shortURL, originalURL string) (*model.URLRecord, error) {
+func (r SQLURLRepository) Save(ctx context.Context, shortURL, originalURL, userID string) (*model.URLRecord, error) {
 	query := `
-        INSERT INTO urls (short_url, original_url) 
-        VALUES ($1, $2)
+        INSERT INTO urls (short_url, original_url, user_id)
+        VALUES ($1, $2, $3)
         ON CONFLICT (original_url) DO NOTHING
-        RETURNING id, short_url, original_url
+        RETURNING id, short_url, original_url, user_id, is_deleted
     `
 
 	var record model.URLRecord
-	err := r.conn.QueryRow(ctx, query, shortURL, originalURL).Scan(
+	err := r.pool.QueryRow(ctx, query, shortURL, originalURL, userID).Scan(
 		&record.UUID,
 		&record.ShortURL,
 		&record.OriginalURL,
+		&record.UserID,
+		&record.IsDeleted,
 	)
 
 	if err != nil {
@@ -48,14 +51,14 @@ func (r SQLURLRepository) Save(ctx context.Context, shortURL, originalURL string
 				return nil, err
 			}
 
-			return existsURL, ErrURLConflict
+			return existsURL, fmt.Errorf("URL '%s' already exists: %w", originalURL, ErrURLConflict)
 		}
 
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgDuplicateErrorCode {
 			// Это unique violation - возможно по short_url
 			if strings.Contains(pgErr.ConstraintName, "short_url") {
-				return nil, ErrShortURLConflict
+				return nil, fmt.Errorf("short URL conflict: %w", ErrShortURLConflict)
 			}
 		}
 
@@ -66,7 +69,7 @@ func (r SQLURLRepository) Save(ctx context.Context, shortURL, originalURL string
 }
 
 func (r SQLURLRepository) SaveBatch(ctx context.Context, records []model.URLRecord) ([]model.URLRecord, error) {
-	tx, err := r.conn.Begin(ctx)
+	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка начала транзакции: %w", err)
 	}
@@ -76,23 +79,25 @@ func (r SQLURLRepository) SaveBatch(ctx context.Context, records []model.URLReco
 
 	for i, record := range records {
 		query := `
-			INSERT INTO urls (short_url, original_url)
-			VALUES ($1, $2)
+			INSERT INTO urls (short_url, original_url, user_id)
+			VALUES ($1, $2, $3)
 			ON CONFLICT (original_url) DO UPDATE SET original_url = EXCLUDED.original_url
-			RETURNING id, short_url, original_url
+			RETURNING id, short_url, original_url, user_id, is_deleted
 		`
 
-		err := tx.QueryRow(ctx, query, record.ShortURL, record.OriginalURL).Scan(
+		err := tx.QueryRow(ctx, query, record.ShortURL, record.OriginalURL, record.UserID).Scan(
 			&result[i].UUID,
 			&result[i].ShortURL,
 			&result[i].OriginalURL,
+			&result[i].UserID,
+			&result[i].IsDeleted,
 		)
 
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgDuplicateErrorCode {
 			// Это unique violation - возможно по short_url
 			if strings.Contains(pgErr.ConstraintName, "short_url") {
-				return nil, ErrShortURLConflict
+				return nil, fmt.Errorf("short URL conflict: %w", ErrShortURLConflict)
 			}
 		}
 
@@ -109,33 +114,41 @@ func (r SQLURLRepository) SaveBatch(ctx context.Context, records []model.URLReco
 }
 
 func (r SQLURLRepository) GetByShortURL(ctx context.Context, shortURL string) (*model.URLRecord, error) {
-	query := `SELECT id, short_url, original_url FROM urls WHERE short_url = $1`
+	query := `SELECT id, short_url, original_url, user_id, is_deleted FROM urls WHERE short_url = $1`
 
 	var record model.URLRecord
-	err := r.conn.QueryRow(ctx, query, shortURL).Scan(
+	err := r.pool.QueryRow(ctx, query, shortURL).Scan(
 		&record.UUID,
 		&record.ShortURL,
 		&record.OriginalURL,
+		&record.UserID,
+		&record.IsDeleted,
 	)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, ErrURLNotFound
+			return nil, fmt.Errorf("URL '%s' not found: %w", shortURL, ErrURLNotFound)
 		}
 		return nil, fmt.Errorf("ошибка получения URL: %w", err)
+	}
+
+	if record.IsDeleted {
+		return nil, fmt.Errorf("URL '%s' has been deleted: %w", shortURL, ErrURLDeleted)
 	}
 
 	return &record, nil
 }
 
 func (r SQLURLRepository) getByOriginalURL(ctx context.Context, originalURL string) (*model.URLRecord, error) {
-	query := `SELECT id, short_url, original_url FROM urls WHERE original_url = $1`
+	query := `SELECT id, short_url, original_url, user_id, is_deleted FROM urls WHERE original_url = $1`
 
 	var record model.URLRecord
-	err := r.conn.QueryRow(ctx, query, originalURL).Scan(
+	err := r.pool.QueryRow(ctx, query, originalURL).Scan(
 		&record.UUID,
 		&record.ShortURL,
 		&record.OriginalURL,
+		&record.UserID,
+		&record.IsDeleted,
 	)
 
 	if err != nil {
@@ -145,6 +158,50 @@ func (r SQLURLRepository) getByOriginalURL(ctx context.Context, originalURL stri
 	return &record, nil
 }
 
+func (r SQLURLRepository) GetByUserID(ctx context.Context, userID string) ([]model.URLRecord, error) {
+	query := `SELECT id, short_url, original_url, user_id, is_deleted FROM urls WHERE user_id = $1`
+
+	rows, err := r.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка получения URL пользователя: %w", err)
+	}
+	defer rows.Close()
+
+	var records []model.URLRecord
+	for rows.Next() {
+		var record model.URLRecord
+		if err := rows.Scan(&record.UUID, &record.ShortURL, &record.OriginalURL, &record.UserID, &record.IsDeleted); err != nil {
+			return nil, fmt.Errorf("ошибка сканирования записи: %w", err)
+		}
+		records = append(records, record)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("ошибка обработки строк: %w", err)
+	}
+
+	return records, nil
+}
+
+func (r SQLURLRepository) DeleteURLs(ctx context.Context, shortURLs []string, userID string) error {
+	if len(shortURLs) == 0 {
+		return nil
+	}
+
+	query := `
+		UPDATE urls
+		SET is_deleted = true
+		WHERE short_url = ANY($1) AND user_id = $2
+	`
+
+	_, err := r.pool.Exec(ctx, query, shortURLs, userID)
+	if err != nil {
+		return fmt.Errorf("ошибка удаления URL: %w", err)
+	}
+
+	return nil
+}
+
 func (r SQLURLRepository) Ping(ctx context.Context) error {
-	return r.conn.Ping(ctx)
+	return r.pool.Ping(ctx)
 }

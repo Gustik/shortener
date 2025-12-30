@@ -20,10 +20,17 @@ type BatchResponse struct {
 	ShortURL      string `json:"short_url"`
 }
 
+type UserURLResponse struct {
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
+}
+
 type URLRecord struct {
 	UUID        uuid.UUID `json:"uuid"`
 	ShortURL    string    `json:"short_url"`
 	OriginalURL string    `json:"original_url"`
+	UserID      string    `json:"user_id"`
+	IsDeleted   bool      `json:"is_deleted"`
 }
 
 func (u *URLRecord) NextID() {

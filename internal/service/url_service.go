@@ -6,14 +6,20 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"slices"
 
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/Gustik/shortener/internal/model"
 	"github.com/Gustik/shortener/internal/repository"
 )
 
-const maxSaveRetries = 5
+const (
+	maxSaveRetries       = 5
+	deleteBatchSize      = 10
+	deleteMaxConcurrency = 3
+)
 
 var (
 	ErrEmptyURL           = errors.New("URL cannot be empty")
@@ -21,13 +27,16 @@ var (
 	ErrEmptyShortID       = errors.New("ShortID cannot be empty")
 	ErrURLNotFound        = errors.New("URL not found")
 	ErrURLExists          = errors.New("URL already exists")
+	ErrURLDeleted         = errors.New("URL has been deleted")
 	ErrMaxRetriesExceeded = errors.New("maximum retry attempts exceeded for generating unique short URL")
 )
 
 type URLService interface {
-	ShortenURL(ctx context.Context, originalURL string) (string, error)
-	ShortenURLBatch(ctx context.Context, urls []model.BatchRequest) ([]model.BatchResponse, error)
+	ShortenURL(ctx context.Context, originalURL, userID string) (string, error)
+	ShortenURLBatch(ctx context.Context, urls []model.BatchRequest, userID string) ([]model.BatchResponse, error)
 	GetOriginalURL(ctx context.Context, shortID string) (string, error)
+	GetUserURLs(ctx context.Context, userID string) ([]model.UserURLResponse, error)
+	DeleteURLs(ctx context.Context, userID string, shortURLs []string)
 	Ping(ctx context.Context) error
 }
 
@@ -45,7 +54,7 @@ func NewURLService(repo repository.URLRepository, baseURL string, logger *zap.Lo
 	}
 }
 
-func (s *urlService) ShortenURL(ctx context.Context, originalURL string) (string, error) {
+func (s *urlService) ShortenURL(ctx context.Context, originalURL, userID string) (string, error) {
 	if originalURL == "" {
 		return "", ErrEmptyURL
 	}
@@ -53,7 +62,7 @@ func (s *urlService) ShortenURL(ctx context.Context, originalURL string) (string
 	for range maxSaveRetries {
 		shortURL := s.generateShortURL()
 
-		savedURL, err := s.repo.Save(ctx, shortURL, originalURL)
+		savedURL, err := s.repo.Save(ctx, shortURL, originalURL, userID)
 		if errors.Is(err, repository.ErrURLConflict) {
 			s.logger.Sugar().Infof("%s", err.Error())
 			return fmt.Sprintf("%s/%s", s.baseURL, savedURL.ShortURL), ErrURLExists
@@ -76,7 +85,7 @@ func (s *urlService) ShortenURL(ctx context.Context, originalURL string) (string
 	return "", ErrMaxRetriesExceeded
 }
 
-func (s *urlService) ShortenURLBatch(ctx context.Context, urls []model.BatchRequest) ([]model.BatchResponse, error) {
+func (s *urlService) ShortenURLBatch(ctx context.Context, urls []model.BatchRequest, userID string) ([]model.BatchResponse, error) {
 	if len(urls) == 0 {
 		return nil, ErrEmptyURLBatch
 	}
@@ -89,6 +98,7 @@ func (s *urlService) ShortenURLBatch(ctx context.Context, urls []model.BatchRequ
 		records[i] = model.URLRecord{
 			ShortURL:    s.generateShortURL(),
 			OriginalURL: urls[i].OriginalURL,
+			UserID:      userID,
 		}
 	}
 
@@ -115,10 +125,54 @@ func (s *urlService) GetOriginalURL(ctx context.Context, shortID string) (string
 
 	url, err := s.repo.GetByShortURL(ctx, shortID)
 	if errors.Is(err, repository.ErrURLNotFound) {
-		return "", ErrURLNotFound
+		return "", fmt.Errorf("short ID '%s' not found: %w", shortID, ErrURLNotFound)
+	}
+	if errors.Is(err, repository.ErrURLDeleted) {
+		return "", fmt.Errorf("short ID '%s' has been deleted: %w", shortID, ErrURLDeleted)
 	}
 
 	return url.OriginalURL, nil
+}
+
+func (s *urlService) GetUserURLs(ctx context.Context, userID string) ([]model.UserURLResponse, error) {
+	records, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]model.UserURLResponse, len(records))
+	for i, record := range records {
+		result[i] = model.UserURLResponse{
+			ShortURL:    fmt.Sprintf("%s/%s", s.baseURL, record.ShortURL),
+			OriginalURL: record.OriginalURL,
+		}
+	}
+
+	return result, nil
+}
+
+func (s *urlService) DeleteURLs(ctx context.Context, userID string, shortURLs []string) {
+	if len(shortURLs) == 0 {
+		return
+	}
+
+	go func() {
+		g := new(errgroup.Group)
+		semaphore := make(chan struct{}, deleteMaxConcurrency)
+
+		for batch := range slices.Chunk(shortURLs, deleteBatchSize) {
+			g.Go(func() error {
+				semaphore <- struct{}{}
+				defer func() { <-semaphore }()
+
+				return s.repo.DeleteURLs(ctx, batch, userID)
+			})
+		}
+
+		if err := g.Wait(); err != nil {
+			s.logger.Error("не удалось удалить пачкой урлы", zap.Error(err))
+		}
+	}()
 }
 
 func (s *urlService) Ping(ctx context.Context) error {
