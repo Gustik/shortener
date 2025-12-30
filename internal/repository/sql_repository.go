@@ -51,14 +51,14 @@ func (r SQLURLRepository) Save(ctx context.Context, shortURL, originalURL, userI
 				return nil, err
 			}
 
-			return existsURL, ErrURLConflict
+			return existsURL, fmt.Errorf("URL '%s' already exists: %w", originalURL, ErrURLConflict)
 		}
 
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgDuplicateErrorCode {
 			// Это unique violation - возможно по short_url
 			if strings.Contains(pgErr.ConstraintName, "short_url") {
-				return nil, ErrShortURLConflict
+				return nil, fmt.Errorf("short URL conflict: %w", ErrShortURLConflict)
 			}
 		}
 
@@ -97,7 +97,7 @@ func (r SQLURLRepository) SaveBatch(ctx context.Context, records []model.URLReco
 		if errors.As(err, &pgErr) && pgErr.Code == pgDuplicateErrorCode {
 			// Это unique violation - возможно по short_url
 			if strings.Contains(pgErr.ConstraintName, "short_url") {
-				return nil, ErrShortURLConflict
+				return nil, fmt.Errorf("short URL conflict: %w", ErrShortURLConflict)
 			}
 		}
 
@@ -127,13 +127,13 @@ func (r SQLURLRepository) GetByShortURL(ctx context.Context, shortURL string) (*
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, ErrURLNotFound
+			return nil, fmt.Errorf("URL '%s' not found: %w", shortURL, ErrURLNotFound)
 		}
 		return nil, fmt.Errorf("ошибка получения URL: %w", err)
 	}
 
 	if record.IsDeleted {
-		return nil, ErrURLDeleted
+		return nil, fmt.Errorf("URL '%s' has been deleted: %w", shortURL, ErrURLDeleted)
 	}
 
 	return &record, nil

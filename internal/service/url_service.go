@@ -36,7 +36,7 @@ type URLService interface {
 	ShortenURLBatch(ctx context.Context, urls []model.BatchRequest, userID string) ([]model.BatchResponse, error)
 	GetOriginalURL(ctx context.Context, shortID string) (string, error)
 	GetUserURLs(ctx context.Context, userID string) ([]model.UserURLResponse, error)
-	DeleteURLs(userID string, shortURLs []string)
+	DeleteURLs(ctx context.Context, userID string, shortURLs []string)
 	Ping(ctx context.Context) error
 }
 
@@ -125,10 +125,10 @@ func (s *urlService) GetOriginalURL(ctx context.Context, shortID string) (string
 
 	url, err := s.repo.GetByShortURL(ctx, shortID)
 	if errors.Is(err, repository.ErrURLNotFound) {
-		return "", ErrURLNotFound
+		return "", fmt.Errorf("short ID '%s' not found: %w", shortID, ErrURLNotFound)
 	}
 	if errors.Is(err, repository.ErrURLDeleted) {
-		return "", ErrURLDeleted
+		return "", fmt.Errorf("short ID '%s' has been deleted: %w", shortID, ErrURLDeleted)
 	}
 
 	return url.OriginalURL, nil
@@ -151,13 +151,12 @@ func (s *urlService) GetUserURLs(ctx context.Context, userID string) ([]model.Us
 	return result, nil
 }
 
-func (s *urlService) DeleteURLs(userID string, shortURLs []string) {
+func (s *urlService) DeleteURLs(ctx context.Context, userID string, shortURLs []string) {
 	if len(shortURLs) == 0 {
 		return
 	}
 
 	go func() {
-		ctx := context.Background()
 		g := new(errgroup.Group)
 		semaphore := make(chan struct{}, deleteMaxConcurrency)
 

@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"testing/synctest"
 
@@ -55,7 +56,7 @@ func TestURLService_DeleteURLs(t *testing.T) {
 			}
 
 			// Удаляем URL асинхронно
-			svc.DeleteURLs(userID, urls)
+			svc.DeleteURLs(ctx, userID, urls)
 
 			// synctest.Wait() автоматически ждёт завершения всех горутин
 			synctest.Wait()
@@ -69,11 +70,12 @@ func TestURLService_DeleteURLs(t *testing.T) {
 	})
 
 	t.Run("Пустой список URL", func(t *testing.T) {
+		ctx := context.Background()
 		repo := repository.NewInMemoryURLRepository()
 		svc := service.NewURLService(repo, "http://localhost", zaplog.NewNoop())
 
 		// Не должно быть паники
-		svc.DeleteURLs("user123", []string{})
+		svc.DeleteURLs(ctx, "user123", []string{})
 	})
 
 	t.Run("Batch удаление большого количества URL", func(t *testing.T) {
@@ -95,7 +97,7 @@ func TestURLService_DeleteURLs(t *testing.T) {
 			}
 
 			// Удаляем URL асинхронно
-			svc.DeleteURLs(userID, urls)
+			svc.DeleteURLs(ctx, userID, urls)
 
 			// synctest.Wait() ждёт завершения всех горутин
 			synctest.Wait()
@@ -104,7 +106,7 @@ func TestURLService_DeleteURLs(t *testing.T) {
 			deletedCount := 0
 			for _, shortID := range urls {
 				_, err := repo.GetByShortURL(ctx, shortID)
-				if err == repository.ErrURLDeleted {
+				if errors.Is(err, repository.ErrURLDeleted) {
 					deletedCount++
 				}
 			}

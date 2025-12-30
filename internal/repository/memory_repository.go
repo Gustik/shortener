@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"sync"
 
@@ -27,10 +28,10 @@ func (r *InMemoryURLRepository) Save(ctx context.Context, shortURL, originalURL,
 
 	for i := range r.urls {
 		if r.urls[i].ShortURL == shortURL {
-			return nil, ErrShortURLConflict
+			return nil, fmt.Errorf("short URL '%s' already exists: %w", shortURL, ErrShortURLConflict)
 		}
 		if r.urls[i].OriginalURL == originalURL {
-			return &r.urls[i], ErrURLConflict
+			return &r.urls[i], fmt.Errorf("URL '%s' already exists: %w", originalURL, ErrURLConflict)
 		}
 	}
 
@@ -47,13 +48,13 @@ func (r *InMemoryURLRepository) GetByShortURL(ctx context.Context, shortURL stri
 	for i := range r.urls {
 		if r.urls[i].ShortURL == shortURL {
 			if r.urls[i].IsDeleted {
-				return nil, ErrURLDeleted
+				return nil, fmt.Errorf("URL '%s' has been deleted: %w", shortURL, ErrURLDeleted)
 			}
 			return &r.urls[i], nil
 		}
 	}
 
-	return nil, ErrURLNotFound
+	return nil, fmt.Errorf("URL '%s' not found: %w", shortURL, ErrURLNotFound)
 }
 
 func (r *InMemoryURLRepository) SaveBatch(ctx context.Context, records []model.URLRecord) ([]model.URLRecord, error) {
@@ -67,7 +68,7 @@ func (r *InMemoryURLRepository) SaveBatch(ctx context.Context, records []model.U
 		existingRecord := (*model.URLRecord)(nil)
 		for j := range r.urls {
 			if r.urls[j].ShortURL == record.ShortURL {
-				return nil, ErrShortURLConflict
+				return nil, fmt.Errorf("short URL '%s' already exists: %w", record.ShortURL, ErrShortURLConflict)
 			}
 			if r.urls[j].OriginalURL == record.OriginalURL {
 				existingRecord = &r.urls[j]

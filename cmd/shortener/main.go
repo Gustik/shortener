@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -37,16 +39,47 @@ func main() {
 	}
 	defer cleanup()
 
-	svc := service.NewURLService(repo, cfg.BaseURL, logger)
-	h := handler.NewURLHandler(svc, logger)
+	// Создаём контекст приложения для graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
+	svc := service.NewURLService(repo, cfg.BaseURL, logger)
+	h := handler.NewURLHandler(ctx, svc, logger)
 	router := handler.SetupRoutes(h, cfg.JWTSecret)
 
-	logger.Sugar().Infof("Запускаем сервер по адресу %s", cfg.ServerAddress.String())
+	runServerWithGracefulShutdown(cancel, cfg.ServerAddress.String(), router, logger)
+}
 
-	if err := http.ListenAndServe(cfg.ServerAddress.String(), router); err != nil {
-		logger.Fatal("Ошибка при запуске сервера", zap.Error(err))
+func runServerWithGracefulShutdown(cancel context.CancelFunc, addr string, handler http.Handler, logger *zap.Logger) {
+	server := &http.Server{
+		Addr:    addr,
+		Handler: handler,
 	}
+
+	// Канал для ожидания сигналов завершения
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		logger.Sugar().Infof("Запускаем сервер по адресу %s", addr)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Fatal("Ошибка при запуске сервера", zap.Error(err))
+		}
+	}()
+
+	<-quit
+	logger.Info("Получен сигнал завершения, начинаем graceful shutdown...")
+
+	cancel()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logger.Error("Ошибка при graceful shutdown", zap.Error(err))
+	}
+
+	logger.Info("Сервер успешно остановлен")
 }
 
 func initRepository(cfg *config.Config, logger *zap.Logger) (repository.URLRepository, func(), error) {

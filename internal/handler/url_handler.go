@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -16,12 +17,14 @@ import (
 )
 
 type URLHandler struct {
+	appCtx  context.Context
 	service service.URLService
 	logger  *zap.Logger
 }
 
-func NewURLHandler(service service.URLService, logger *zap.Logger) *URLHandler {
+func NewURLHandler(appCtx context.Context, service service.URLService, logger *zap.Logger) *URLHandler {
 	return &URLHandler{
+		appCtx:  appCtx,
 		service: service,
 		logger:  logger,
 	}
@@ -210,8 +213,8 @@ func (h *URLHandler) DeleteUserURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Асинхронное удаление
-	h.service.DeleteURLs(userID, shortURLs)
+	// Асинхронное удаление используя контекст приложения, а не контекст запроса
+	h.service.DeleteURLs(h.appCtx, userID, shortURLs)
 
 	w.WriteHeader(http.StatusAccepted)
 }
