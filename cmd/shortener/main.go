@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/Gustik/shortener/internal/config"
@@ -37,16 +39,47 @@ func main() {
 	}
 	defer cleanup()
 
+	// Создаём контекст приложения для graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	svc := service.NewURLService(repo, cfg.BaseURL, logger)
-	h := handler.NewURLHandler(svc, logger)
+	h := handler.NewURLHandler(ctx, svc, logger)
+	router := handler.SetupRoutes(h, cfg.JWTSecret)
 
-	router := handler.SetupRoutes(h)
+	runServerWithGracefulShutdown(cancel, cfg.ServerAddress.String(), router, logger)
+}
 
-	logger.Sugar().Infof("Запускаем сервер по адресу %s", cfg.ServerAddress.String())
-
-	if err := http.ListenAndServe(cfg.ServerAddress.String(), router); err != nil {
-		logger.Fatal("Ошибка при запуске сервера", zap.Error(err))
+func runServerWithGracefulShutdown(cancel context.CancelFunc, addr string, handler http.Handler, logger *zap.Logger) {
+	server := &http.Server{
+		Addr:    addr,
+		Handler: handler,
 	}
+
+	// Канал для ожидания сигналов завершения
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		logger.Sugar().Infof("Запускаем сервер по адресу %s", addr)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Fatal("Ошибка при запуске сервера", zap.Error(err))
+		}
+	}()
+
+	<-quit
+	logger.Info("Получен сигнал завершения, начинаем graceful shutdown...")
+
+	cancel()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logger.Error("Ошибка при graceful shutdown", zap.Error(err))
+	}
+
+	logger.Info("Сервер успешно остановлен")
 }
 
 func initRepository(cfg *config.Config, logger *zap.Logger) (repository.URLRepository, func(), error) {
@@ -97,30 +130,28 @@ func initSQLRepository(cfg *config.Config, logger *zap.Logger) (repository.URLRe
 	logger.Info("Миграции успешно применены")
 
 	logger.Info("Подключение к PostgreSQL")
-	conn, err := pgx.Connect(context.Background(), cfg.DatabaseDSN)
+	pool, err := pgxpool.New(context.Background(), cfg.DatabaseDSN)
 	if err != nil {
 		return nil, nil, fmt.Errorf("ошибка подключения к БД: %w", err)
 	}
 
-	repo, err := repository.NewSQLRepository(conn)
+	repo, err := repository.NewSQLRepository(pool)
 	if err != nil {
-		conn.Close(context.Background())
+		pool.Close()
 		return nil, nil, fmt.Errorf("ошибка инициализации SQL репозитория: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := repo.Ping(ctx); err != nil {
-		conn.Close(context.Background())
+		pool.Close()
 		return nil, nil, fmt.Errorf("ошибка проверки подключения к БД: %w", err)
 	}
 	logger.Info("Успешное подключение к PostgreSQL")
 
 	cleanup := func() {
 		logger.Info("Закрываю соединение с posgtres")
-		if err := conn.Close(context.Background()); err != nil {
-			logger.Error("Ошибка закрытия подключения к БД", zap.Error(err))
-		}
+		pool.Close()
 	}
 
 	return repo, cleanup, nil
