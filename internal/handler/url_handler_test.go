@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Gustik/shortener/internal/audit"
 	"github.com/Gustik/shortener/internal/handler"
 	"github.com/Gustik/shortener/internal/model"
 	"github.com/Gustik/shortener/internal/repository"
@@ -60,7 +61,7 @@ func TestURLHandler_ShortenURL(t *testing.T) {
 
 	repo := repository.NewInMemoryURLRepository()
 	service := service.NewURLService(repo, baseURL, zaplog.NewNoop())
-	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), service, zaplog.NewNoop()), jwtSecret)
+	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), service, zaplog.NewNoop(), audit.DummyPublisher{}), jwtSecret)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -129,7 +130,7 @@ func TestURLHandler_ShortenURLV2(t *testing.T) {
 
 	repo := repository.NewInMemoryURLRepository()
 	service := service.NewURLService(repo, baseURL, zaplog.NewNoop())
-	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), service, zaplog.NewNoop()), jwtSecret)
+	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), service, zaplog.NewNoop(), audit.DummyPublisher{}), jwtSecret)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -215,7 +216,7 @@ func TestURLHandler_ShortenURLBatch(t *testing.T) {
 
 	repo := repository.NewInMemoryURLRepository()
 	service := service.NewURLService(repo, baseURL, zaplog.NewNoop())
-	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), service, zaplog.NewNoop()), jwtSecret)
+	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), service, zaplog.NewNoop(), audit.DummyPublisher{}), jwtSecret)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -282,7 +283,7 @@ func TestURLHandler_GetOriginalURL(t *testing.T) {
 
 	repo := repository.NewInMemoryURLRepository()
 	service := service.NewURLService(repo, baseURL, zaplog.NewNoop())
-	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), service, zaplog.NewNoop()), jwtSecret)
+	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), service, zaplog.NewNoop(), audit.DummyPublisher{}), jwtSecret)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -309,7 +310,7 @@ func TestURLHandler_GetOriginalURL(t *testing.T) {
 func TestURLHandler_GetOriginalURL_Deleted(t *testing.T) {
 	repo := repository.NewInMemoryURLRepository()
 	service := service.NewURLService(repo, baseURL, zaplog.NewNoop())
-	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), service, zaplog.NewNoop()), jwtSecret)
+	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), service, zaplog.NewNoop(), audit.DummyPublisher{}), jwtSecret)
 
 	ctx := context.Background()
 	userID := "test-user"
@@ -377,7 +378,7 @@ func TestURLHandler_DeleteUserURLs(t *testing.T) {
 
 	repo := repository.NewInMemoryURLRepository()
 	service := service.NewURLService(repo, baseURL, zaplog.NewNoop())
-	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), service, zaplog.NewNoop()), jwtSecret)
+	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), service, zaplog.NewNoop(), audit.DummyPublisher{}), jwtSecret)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

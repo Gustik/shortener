@@ -7,9 +7,11 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
+	"github.com/Gustik/shortener/internal/audit"
 	"github.com/Gustik/shortener/internal/handler/middleware"
 	"github.com/Gustik/shortener/internal/model"
 	"github.com/Gustik/shortener/internal/service"
@@ -20,13 +22,15 @@ type URLHandler struct {
 	appCtx  context.Context
 	service service.URLService
 	logger  *zap.Logger
+	auditor audit.Publisher
 }
 
-func NewURLHandler(appCtx context.Context, service service.URLService, logger *zap.Logger) *URLHandler {
+func NewURLHandler(appCtx context.Context, service service.URLService, logger *zap.Logger, auditor audit.Publisher) *URLHandler {
 	return &URLHandler{
 		appCtx:  appCtx,
 		service: service,
 		logger:  logger,
+		auditor: auditor,
 	}
 }
 
@@ -45,11 +49,14 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err := h.service.ShortenURL(r.Context(), strings.TrimSpace(string(body)), userID)
+	url := strings.TrimSpace(string(body))
+	shortURL, err := h.service.ShortenURL(r.Context(), url, userID)
 	if errors.Is(err, service.ErrEmptyURL) {
 		http.Error(w, "URL cannot be empty", http.StatusBadRequest)
 		return
 	}
+
+	w.Header().Set("Content-Type", "text/plain")
 
 	if errors.Is(err, service.ErrURLExists) {
 		w.WriteHeader(http.StatusConflict)
@@ -61,8 +68,16 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 	}
 
-	w.Header().Set("Content-Type", "text/plain")
 	w.Write([]byte(shortURL))
+
+	event := model.AuditEvent{
+		Timestamp: time.Now().Unix(),
+		Action:    "shorten",
+		UserID:    userID,
+		URL:       url,
+	}
+
+	h.auditor.Publish(event)
 }
 
 func (h *URLHandler) ShortenURLV2(w http.ResponseWriter, r *http.Request) {
@@ -105,6 +120,15 @@ func (h *URLHandler) ShortenURLV2(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(&resp); err != nil {
 		h.logger.Error("failed to encode response", zap.Error(err))
 	}
+
+	event := model.AuditEvent{
+		Timestamp: time.Now().Unix(),
+		Action:    "shorten",
+		UserID:    userID,
+		URL:       req.URL,
+	}
+
+	h.auditor.Publish(event)
 }
 
 func (h *URLHandler) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
@@ -161,6 +185,19 @@ func (h *URLHandler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+
+	event := model.AuditEvent{
+		Timestamp: time.Now().Unix(),
+		Action:    "follow",
+		URL:       originalURL,
+	}
+
+	userID, ok := middleware.GetUserID(r.Context())
+	if ok {
+		event.UserID = userID
+	}
+
+	h.auditor.Publish(event)
 
 	w.Header().Set("Location", originalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)

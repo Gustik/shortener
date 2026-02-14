@@ -60,6 +60,8 @@ type Config struct {
 	DatabaseDSN     string
 	StorageType     string
 	JWTSecret       string
+	AuditFile       string
+	AuditURL        string
 }
 
 type Flags struct {
@@ -69,6 +71,8 @@ type Flags struct {
 	FileStoragePath string
 	DatabaseDSN     string
 	JWTSecret       string
+	AuditFile       string
+	AuditURL        string
 }
 
 func Load() *Config {
@@ -93,6 +97,8 @@ func Load() *Config {
 
 	cfg.FileStoragePath = getConfigValue("FILE_STORAGE_PATH", flags.FileStoragePath, "")
 	cfg.DatabaseDSN = getConfigValue("DATABASE_DSN", flags.DatabaseDSN, "")
+	cfg.AuditFile = getConfigValue("AUDIT_FILE", flags.AuditFile, "")
+	cfg.AuditURL = getConfigValue("AUDIT_URL", flags.AuditURL, "")
 
 	if cfg.DatabaseDSN != "" {
 		cfg.StorageType = StorageSQL
@@ -113,6 +119,8 @@ func parseFlags() *Flags {
 	flag.StringVar(&f.DatabaseDSN, "d", "", "DSN подключения к бд")
 	flag.StringVar(&f.LogLevel, "l", "", "уровень логирования")
 	flag.StringVar(&f.JWTSecret, "s", "", "секретный ключ для JWT")
+	flag.StringVar(&f.AuditFile, "audit-file", "", "путь файла лога аудита")
+	flag.StringVar(&f.AuditURL, "audit-url", "", "URL аудита")
 	flag.Parse()
 
 	return f

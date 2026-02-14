@@ -36,3 +36,10 @@ type URLRecord struct {
 func (u *URLRecord) NextID() {
 	u.UUID = uuid.New()
 }
+
+type AuditEvent struct {
+	Timestamp int64  `json:"ts"`
+	Action    string `json:"action"`
+	UserID    string `json:"user_id"`
+	URL       string `json:"url"`
+}

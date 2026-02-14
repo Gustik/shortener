@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
+	"github.com/Gustik/shortener/internal/audit"
 	"github.com/Gustik/shortener/internal/config"
 	"github.com/Gustik/shortener/internal/handler"
 	"github.com/Gustik/shortener/internal/repository"
@@ -43,8 +44,11 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	auditor, auditCleanup := audit.NewPublisher(cfg, logger)
+	defer auditCleanup()
+
 	svc := service.NewURLService(repo, cfg.BaseURL, logger)
-	h := handler.NewURLHandler(ctx, svc, logger)
+	h := handler.NewURLHandler(ctx, svc, logger, auditor)
 	router := handler.SetupRoutes(h, cfg.JWTSecret)
 
 	runServerWithGracefulShutdown(cancel, cfg.ServerAddress.String(), router, logger)
