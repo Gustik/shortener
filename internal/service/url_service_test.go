@@ -1,4 +1,4 @@
-package service_test
+package service
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"testing/synctest"
 
 	"github.com/Gustik/shortener/internal/repository"
-	"github.com/Gustik/shortener/internal/service"
+
 	"github.com/Gustik/shortener/internal/zaplog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,7 +16,7 @@ import (
 func TestURLService_GetOriginalURL_Deleted(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewInMemoryURLRepository()
-	svc := service.NewURLService(repo, "http://localhost", zaplog.NewNoop())
+	svc := NewURLService(repo, "http://localhost", zaplog.NewNoop())
 
 	userID := "user123"
 	shortID := "short1"
@@ -36,7 +36,7 @@ func TestURLService_GetOriginalURL_Deleted(t *testing.T) {
 
 	// Проверяем, что URL возвращает ошибку ErrURLDeleted
 	_, err = svc.GetOriginalURL(ctx, shortID)
-	assert.ErrorIs(t, err, service.ErrURLDeleted)
+	assert.ErrorIs(t, err, ErrURLDeleted)
 }
 
 func TestURLService_DeleteURLs(t *testing.T) {
@@ -44,7 +44,7 @@ func TestURLService_DeleteURLs(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			ctx := context.Background()
 			repo := repository.NewInMemoryURLRepository()
-			svc := service.NewURLService(repo, "http://localhost", zaplog.NewNoop())
+			svc := NewURLService(repo, "http://localhost", zaplog.NewNoop())
 
 			userID := "user123"
 
@@ -72,7 +72,7 @@ func TestURLService_DeleteURLs(t *testing.T) {
 	t.Run("Пустой список URL", func(t *testing.T) {
 		ctx := context.Background()
 		repo := repository.NewInMemoryURLRepository()
-		svc := service.NewURLService(repo, "http://localhost", zaplog.NewNoop())
+		svc := NewURLService(repo, "http://localhost", zaplog.NewNoop())
 
 		// Не должно быть паники
 		svc.DeleteURLs(ctx, "user123", []string{})
@@ -82,7 +82,7 @@ func TestURLService_DeleteURLs(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			ctx := context.Background()
 			repo := repository.NewInMemoryURLRepository()
-			svc := service.NewURLService(repo, "http://localhost", zaplog.NewNoop())
+			svc := NewURLService(repo, "http://localhost", zaplog.NewNoop())
 
 			userID := "user123"
 			count := 50
@@ -114,4 +114,12 @@ func TestURLService_DeleteURLs(t *testing.T) {
 			assert.Equal(t, count, deletedCount, "Все URL должны быть удалены")
 		})
 	})
+}
+
+func BenchmarkGenerateShortURL(b *testing.B) {
+	repo := repository.NewInMemoryURLRepository()
+	svc := NewURLService(repo, "http://localhost", zaplog.NewNoop())
+	for b.Loop() {
+		svc.generateShortURL()
+	}
 }

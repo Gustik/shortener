@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -33,6 +34,15 @@ func main() {
 		os.Exit(1)
 	}
 	defer logger.Sync()
+
+	if cfg.PprofEnabled {
+		go func() {
+			logger.Info("pprof server listening on :6060")
+			if err := http.ListenAndServe(":6060", nil); err != nil {
+				logger.Error("pprof server error", zap.Error(err))
+			}
+		}()
+	}
 
 	repo, cleanup, err := initRepository(cfg, logger)
 	if err != nil {

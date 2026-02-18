@@ -1,12 +1,13 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -17,6 +18,10 @@ import (
 	"github.com/Gustik/shortener/internal/service"
 	"github.com/go-chi/chi/v5"
 )
+
+var bodyBufPool = sync.Pool{
+	New: func() any { return new(bytes.Buffer) },
+}
 
 type URLHandler struct {
 	appCtx  context.Context
@@ -43,13 +48,16 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
+	buf := bodyBufPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer bodyBufPool.Put(buf)
+
+	if _, err := buf.ReadFrom(r.Body); err != nil {
 		http.Error(w, "Failed to read body", http.StatusBadRequest)
 		return
 	}
 
-	url := strings.TrimSpace(string(body))
+	url := strings.TrimSpace(buf.String())
 	shortURL, err := h.service.ShortenURL(r.Context(), url, userID)
 	if errors.Is(err, service.ErrEmptyURL) {
 		http.Error(w, "URL cannot be empty", http.StatusBadRequest)

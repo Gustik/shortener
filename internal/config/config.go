@@ -62,6 +62,7 @@ type Config struct {
 	JWTSecret       string
 	AuditFile       string
 	AuditURL        string
+	PprofEnabled    bool
 }
 
 type Flags struct {
@@ -99,6 +100,10 @@ func Load() *Config {
 	cfg.DatabaseDSN = getConfigValue("DATABASE_DSN", flags.DatabaseDSN, "")
 	cfg.AuditFile = getConfigValue("AUDIT_FILE", flags.AuditFile, "")
 	cfg.AuditURL = getConfigValue("AUDIT_URL", flags.AuditURL, "")
+
+	if v, ok := os.LookupEnv("PPROF_ENABLED"); ok && v == "true" {
+		cfg.PprofEnabled = true
+	}
 
 	if cfg.DatabaseDSN != "" {
 		cfg.StorageType = StorageSQL
