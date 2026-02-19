@@ -9,10 +9,11 @@ import (
 	"strings"
 )
 
+// Константы типа хранилища определяют, какая реализация URLRepository используется.
 const (
-	StorageMem  string = "mem"
-	StorageFile string = "file"
-	StorageSQL  string = "sql"
+	StorageMem  string = "mem"  // хранение в памяти
+	StorageFile string = "file" // хранение в файле (JSON-lines)
+	StorageSQL  string = "sql"  // хранение в PostgreSQL
 )
 
 const (
@@ -22,11 +23,14 @@ const (
 	defaultJWTSecret     = "default-secret-key-change-in-production"
 )
 
+// NetAddr — сетевой адрес, состоящий из хоста и порта.
+// Реализует интерфейс flag.Value для использования с flag.Var.
 type NetAddr struct {
 	Host string
 	Port int
 }
 
+// String возвращает адрес в формате "host:port".
 func (n *NetAddr) String() string {
 	if n.Host == "" && n.Port == 0 {
 		return ""
@@ -35,6 +39,7 @@ func (n *NetAddr) String() string {
 	return fmt.Sprintf("%s:%d", n.Host, n.Port)
 }
 
+// Set разбирает строку "host:port" и заполняет поля NetAddr.
 func (n *NetAddr) Set(value string) error {
 	parts := strings.Split(value, ":")
 	if len(parts) != 2 {
@@ -52,6 +57,8 @@ func (n *NetAddr) Set(value string) error {
 	return nil
 }
 
+// Config хранит конфигурацию приложения, собранную из
+// переменных окружения, флагов командной строки и значений по умолчанию.
 type Config struct {
 	ServerAddress   NetAddr
 	BaseURL         string
@@ -65,6 +72,7 @@ type Config struct {
 	PprofEnabled    bool
 }
 
+// Flags хранит значения, полученные из флагов командной строки.
 type Flags struct {
 	ServerAddr      string
 	BaseURL         string
@@ -76,6 +84,8 @@ type Flags struct {
 	AuditURL        string
 }
 
+// Load создаёт Config, объединяя переменные окружения, флаги командной
+// строки и значения по умолчанию (в указанном порядке приоритета).
 func Load() *Config {
 	cfg := &Config{}
 

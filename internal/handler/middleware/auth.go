@@ -14,11 +14,16 @@ type contextKey string
 
 const UserIDContextKey contextKey = "userID"
 
+// Claims расширяет jwt.RegisteredClaims полем UserID для
+// идентификации пользователя сервиса сокращения ссылок.
 type Claims struct {
 	UserID string `json:"user_id"`
 	jwt.RegisteredClaims
 }
 
+// AuthMiddleware возвращает middleware, который валидирует JWT-токен из
+// куки "token". Если валидный токен не найден, создаётся новый
+// пользователь и устанавливается подписанная кука.
 func AuthMiddleware(jwtSecret string, logger *zap.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +86,8 @@ func AuthMiddleware(jwtSecret string, logger *zap.Logger) func(http.Handler) htt
 	}
 }
 
-// GetUserID извлекает userID из контекста
+// GetUserID извлекает ID пользователя из контекста запроса.
+// Возвращает false, если ID пользователя отсутствует.
 func GetUserID(ctx context.Context) (string, bool) {
 	userID, ok := ctx.Value(UserIDContextKey).(string)
 	return userID, ok

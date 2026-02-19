@@ -9,6 +9,7 @@ import (
 	myMiddleware "github.com/Gustik/shortener/internal/handler/middleware"
 )
 
+// SetupRoutes создаёт chi-роутер со всеми маршрутами и middleware приложения.
 func SetupRoutes(handler *URLHandler, jwtSecret string) http.Handler {
 	r := chi.NewRouter()
 

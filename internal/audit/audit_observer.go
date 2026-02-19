@@ -11,16 +11,21 @@ import (
 	"github.com/Gustik/shortener/internal/model"
 )
 
+// AuditObserver получает события аудита от Publisher.
 type AuditObserver interface {
+	// Notify доставляет событие аудита наблюдателю.
 	Notify(event model.AuditEvent) error
+	// GetID возвращает уникальный идентификатор типа наблюдателя.
 	GetID() string
 }
 
+// FileObserver — AuditObserver, дописывающий события в файл в формате JSON-lines.
 type FileObserver struct {
 	file *os.File
 	mu   sync.Mutex
 }
 
+// NewFileObserver создаёт FileObserver, записывающий в указанный файл.
 func NewFileObserver(file *os.File) *FileObserver {
 	return &FileObserver{
 		file: file,
@@ -49,10 +54,12 @@ func (f *FileObserver) GetID() string {
 	return "file"
 }
 
+// HTTPObserver — AuditObserver, отправляющий события через HTTP POST в формате JSON.
 type HTTPObserver struct {
 	url string
 }
 
+// NewHTTPObserver создаёт HTTPObserver, отправляющий события на указанный URL.
 func NewHTTPObserver(url string) *HTTPObserver {
 	return &HTTPObserver{url: url}
 }

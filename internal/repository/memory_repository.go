@@ -11,11 +11,14 @@ import (
 	"github.com/Gustik/shortener/internal/model"
 )
 
+// InMemoryURLRepository — потокобезопасная реализация URLRepository в памяти.
+// Данные не сохраняются между перезапусками процесса.
 type InMemoryURLRepository struct {
 	mu   sync.Mutex
 	urls []model.URLRecord
 }
 
+// NewInMemoryURLRepository создаёт пустой InMemoryURLRepository.
 func NewInMemoryURLRepository() *InMemoryURLRepository {
 	return &InMemoryURLRepository{
 		urls: make([]model.URLRecord, 0, 10),

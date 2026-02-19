@@ -8,16 +8,24 @@ import (
 	"go.uber.org/zap"
 )
 
+// Publisher рассылает события аудита зарегистрированным наблюдателям.
 type Publisher interface {
+	// Register добавляет наблюдателя, который будет получать будущие события.
 	Register(AuditObserver)
+	// Publish отправляет событие всем зарегистрированным наблюдателям.
 	Publish(model.AuditEvent)
 }
 
+// AuditPublisher — Publisher по умолчанию, рассылающий события набору
+// зарегистрированных экземпляров AuditObserver.
 type AuditPublisher struct {
 	observers map[string]AuditObserver
 	logger    *zap.Logger
 }
 
+// NewPublisher создаёт Publisher, сконфигурированный из cfg. Возвращает функцию
+// очистки, которую следует вызвать при завершении. Если назначения аудита
+// не настроены, возвращается DummyPublisher.
 func NewPublisher(cfg *config.Config, logger *zap.Logger) (Publisher, func()) {
 	noop := func() {}
 
@@ -56,6 +64,7 @@ func NewPublisher(cfg *config.Config, logger *zap.Logger) (Publisher, func()) {
 	return auditPublisher, cleanup
 }
 
+// Register добавляет наблюдателя в издатель, используя его ID как ключ.
 func (p *AuditPublisher) Register(o AuditObserver) {
 	if p.observers == nil {
 		p.observers = make(map[string]AuditObserver)
@@ -63,6 +72,8 @@ func (p *AuditPublisher) Register(o AuditObserver) {
 	p.observers[o.GetID()] = o
 }
 
+// Publish отправляет событие каждому зарегистрированному наблюдателю. Ошибки
+// логируются, но не останавливают доставку остальным наблюдателям.
 func (p *AuditPublisher) Publish(event model.AuditEvent) {
 	for _, obs := range p.observers {
 		if err := obs.Notify(event); err != nil {
@@ -71,6 +82,7 @@ func (p *AuditPublisher) Publish(event model.AuditEvent) {
 	}
 }
 
+// DummyPublisher — заглушка Publisher, используемая при отключённом аудите.
 type DummyPublisher struct{}
 
 func (DummyPublisher) Register(AuditObserver)   {}

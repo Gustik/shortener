@@ -4,6 +4,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// New создаёт production zap.Logger с указанным уровнем логирования
+// (например "info", "debug", "error").
 func New(level string) (*zap.Logger, error) {
 	lvl, err := zap.ParseAtomicLevel(level)
 	if err != nil {
@@ -21,6 +23,7 @@ func New(level string) (*zap.Logger, error) {
 	return zl, nil
 }
 
+// NewNoop возвращает no-op логгер, отбрасывающий весь вывод. Полезен в тестах.
 func NewNoop() *zap.Logger {
 	return zap.NewNop()
 }
