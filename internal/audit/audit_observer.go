@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"sync"
+
+	"github.com/hashicorp/go-retryablehttp"
 
 	"github.com/Gustik/shortener/internal/model"
 )
@@ -54,13 +55,18 @@ func (f *FileObserver) GetID() string {
 }
 
 // HTTPObserver — AuditObserver, отправляющий события через HTTP POST в формате JSON.
+// Использует retryablehttp для автоматических повторных попыток при сбоях.
 type HTTPObserver struct {
-	url string
+	url    string
+	client *retryablehttp.Client
 }
 
 // NewHTTPObserver создаёт HTTPObserver, отправляющий события на указанный URL.
 func NewHTTPObserver(url string) *HTTPObserver {
-	return &HTTPObserver{url: url}
+	client := retryablehttp.NewClient()
+	client.RetryMax = 3
+
+	return &HTTPObserver{url: url, client: client}
 }
 
 func (h *HTTPObserver) Notify(event model.AuditEvent) error {
@@ -69,7 +75,7 @@ func (h *HTTPObserver) Notify(event model.AuditEvent) error {
 		return fmt.Errorf("failed to marshal event: %w", err)
 	}
 
-	resp, err := http.Post(h.url, "application/json", bytes.NewReader(data))
+	resp, err := h.client.Post(h.url, "application/json", bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("failed to send audit event: %w", err)
 	}
