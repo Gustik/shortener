@@ -2,6 +2,7 @@ package audit
 
 import (
 	"os"
+	"sync"
 
 	"github.com/Gustik/shortener/internal/config"
 	"github.com/Gustik/shortener/internal/model"
@@ -19,6 +20,7 @@ type Publisher interface {
 // AuditPublisher — Publisher по умолчанию, рассылающий события набору
 // зарегистрированных экземпляров AuditObserver.
 type AuditPublisher struct {
+	mu        sync.RWMutex
 	observers map[string]AuditObserver
 	logger    *zap.Logger
 }
@@ -34,7 +36,8 @@ func NewPublisher(cfg *config.Config, logger *zap.Logger) (Publisher, func()) {
 	}
 
 	auditPublisher := &AuditPublisher{
-		logger: logger,
+		observers: make(map[string]AuditObserver),
+		logger:    logger,
 	}
 
 	var auditFile *os.File
@@ -66,15 +69,18 @@ func NewPublisher(cfg *config.Config, logger *zap.Logger) (Publisher, func()) {
 
 // Register добавляет наблюдателя в издатель, используя его ID как ключ.
 func (p *AuditPublisher) Register(o AuditObserver) {
-	if p.observers == nil {
-		p.observers = make(map[string]AuditObserver)
-	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.observers[o.GetID()] = o
 }
 
 // Publish отправляет событие каждому зарегистрированному наблюдателю. Ошибки
 // логируются, но не останавливают доставку остальным наблюдателям.
 func (p *AuditPublisher) Publish(event model.AuditEvent) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
 	for _, obs := range p.observers {
 		if err := obs.Notify(event); err != nil {
 			p.logger.Error("audit notify failed", zap.String("observer", obs.GetID()), zap.Error(err))

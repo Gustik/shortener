@@ -45,7 +45,7 @@ func (f *FileObserver) Notify(event model.AuditEvent) error {
 	if _, err = f.file.Write(data); err != nil {
 		return fmt.Errorf("failed to write event: %w", err)
 	}
-	defer f.mu.Unlock()
+	f.mu.Unlock()
 
 	return nil
 }
