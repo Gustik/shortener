@@ -12,12 +12,17 @@ import (
 	"github.com/Gustik/shortener/internal/model"
 )
 
+// FileURLRepository расширяет InMemoryURLRepository, добавляя персистентность
+// в файл формата JSON-lines. При создании загружаются существующие записи;
+// новые записи дописываются в файл при каждой операции записи.
 type FileURLRepository struct {
 	InMemoryURLRepository
 	file   *os.File
 	writer *bufio.Writer
 }
 
+// NewFileURLRepository создаёт FileURLRepository, использующий указанный файл.
+// Перед возвратом загружает ранее сохранённые записи из файла.
 func NewFileURLRepository(file *os.File) (*FileURLRepository, error) {
 	repo := &FileURLRepository{
 		InMemoryURLRepository: *NewInMemoryURLRepository(),

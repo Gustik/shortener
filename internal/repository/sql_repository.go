@@ -15,10 +15,13 @@ import (
 
 const pgDuplicateErrorCode = "23505"
 
+// SQLURLRepository — реализация URLRepository на базе PostgreSQL через pgx.
 type SQLURLRepository struct {
 	pool *pgxpool.Pool
 }
 
+// NewSQLRepository создаёт новый SQLURLRepository, используя указанный
+// пул соединений.
 func NewSQLRepository(pool *pgxpool.Pool) (*SQLURLRepository, error) {
 	return &SQLURLRepository{
 		pool: pool,

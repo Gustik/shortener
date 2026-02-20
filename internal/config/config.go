@@ -9,10 +9,11 @@ import (
 	"strings"
 )
 
+// Константы типа хранилища определяют, какая реализация URLRepository используется.
 const (
-	StorageMem  string = "mem"
-	StorageFile string = "file"
-	StorageSQL  string = "sql"
+	StorageMem  string = "mem"  // хранение в памяти
+	StorageFile string = "file" // хранение в файле (JSON-lines)
+	StorageSQL  string = "sql"  // хранение в PostgreSQL
 )
 
 const (
@@ -22,11 +23,14 @@ const (
 	defaultJWTSecret     = "default-secret-key-change-in-production"
 )
 
+// NetAddr — сетевой адрес, состоящий из хоста и порта.
+// Реализует интерфейс flag.Value для использования с flag.Var.
 type NetAddr struct {
 	Host string
 	Port int
 }
 
+// String возвращает адрес в формате "host:port".
 func (n *NetAddr) String() string {
 	if n.Host == "" && n.Port == 0 {
 		return ""
@@ -35,6 +39,7 @@ func (n *NetAddr) String() string {
 	return fmt.Sprintf("%s:%d", n.Host, n.Port)
 }
 
+// Set разбирает строку "host:port" и заполняет поля NetAddr.
 func (n *NetAddr) Set(value string) error {
 	parts := strings.Split(value, ":")
 	if len(parts) != 2 {
@@ -52,6 +57,8 @@ func (n *NetAddr) Set(value string) error {
 	return nil
 }
 
+// Config хранит конфигурацию приложения, собранную из
+// переменных окружения, флагов командной строки и значений по умолчанию.
 type Config struct {
 	ServerAddress   NetAddr
 	BaseURL         string
@@ -60,8 +67,12 @@ type Config struct {
 	DatabaseDSN     string
 	StorageType     string
 	JWTSecret       string
+	AuditFile       string
+	AuditURL        string
+	PprofEnabled    bool
 }
 
+// Flags хранит значения, полученные из флагов командной строки.
 type Flags struct {
 	ServerAddr      string
 	BaseURL         string
@@ -69,8 +80,12 @@ type Flags struct {
 	FileStoragePath string
 	DatabaseDSN     string
 	JWTSecret       string
+	AuditFile       string
+	AuditURL        string
 }
 
+// Load создаёт Config, объединяя переменные окружения, флаги командной
+// строки и значения по умолчанию (в указанном порядке приоритета).
 func Load() *Config {
 	cfg := &Config{}
 
@@ -93,6 +108,12 @@ func Load() *Config {
 
 	cfg.FileStoragePath = getConfigValue("FILE_STORAGE_PATH", flags.FileStoragePath, "")
 	cfg.DatabaseDSN = getConfigValue("DATABASE_DSN", flags.DatabaseDSN, "")
+	cfg.AuditFile = getConfigValue("AUDIT_FILE", flags.AuditFile, "")
+	cfg.AuditURL = getConfigValue("AUDIT_URL", flags.AuditURL, "")
+
+	if v, ok := os.LookupEnv("PPROF_ENABLED"); ok && v == "true" {
+		cfg.PprofEnabled = true
+	}
 
 	if cfg.DatabaseDSN != "" {
 		cfg.StorageType = StorageSQL
@@ -113,6 +134,8 @@ func parseFlags() *Flags {
 	flag.StringVar(&f.DatabaseDSN, "d", "", "DSN подключения к бд")
 	flag.StringVar(&f.LogLevel, "l", "", "уровень логирования")
 	flag.StringVar(&f.JWTSecret, "s", "", "секретный ключ для JWT")
+	flag.StringVar(&f.AuditFile, "audit-file", "", "путь файла лога аудита")
+	flag.StringVar(&f.AuditURL, "audit-url", "", "URL аудита")
 	flag.Parse()
 
 	return f

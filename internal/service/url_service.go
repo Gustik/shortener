@@ -21,6 +21,7 @@ const (
 	deleteMaxConcurrency = 3
 )
 
+// Ошибки уровня сервиса, возвращаемые методами URLService.
 var (
 	ErrEmptyURL           = errors.New("URL cannot be empty")
 	ErrEmptyURLBatch      = errors.New("URL batch cannot be empty")
@@ -31,12 +32,19 @@ var (
 	ErrMaxRetriesExceeded = errors.New("maximum retry attempts exceeded for generating unique short URL")
 )
 
+// URLService предоставляет операции сокращения, получения и управления URL.
 type URLService interface {
+	// ShortenURL создаёт сокращённый URL и возвращает его полный адрес.
 	ShortenURL(ctx context.Context, originalURL, userID string) (string, error)
+	// ShortenURLBatch создаёт сокращённые URL для пакета оригинальных ссылок.
 	ShortenURLBatch(ctx context.Context, urls []model.BatchRequest, userID string) ([]model.BatchResponse, error)
+	// GetOriginalURL разрешает короткий идентификатор в оригинальный URL.
 	GetOriginalURL(ctx context.Context, shortID string) (string, error)
+	// GetUserURLs возвращает все сокращённые URL, принадлежащие пользователю.
 	GetUserURLs(ctx context.Context, userID string) ([]model.UserURLResponse, error)
+	// DeleteURLs асинхронно помечает указанные короткие URL как удалённые.
 	DeleteURLs(ctx context.Context, userID string, shortURLs []string)
+	// Ping проверяет доступность хранилища.
 	Ping(ctx context.Context) error
 }
 
@@ -46,7 +54,8 @@ type urlService struct {
 	logger  *zap.Logger
 }
 
-func NewURLService(repo repository.URLRepository, baseURL string, logger *zap.Logger) URLService {
+// NewURLService возвращает новый URLService, использующий указанный репозиторий.
+func NewURLService(repo repository.URLRepository, baseURL string, logger *zap.Logger) *urlService {
 	return &urlService{
 		repo:    repo,
 		baseURL: baseURL,
@@ -65,7 +74,7 @@ func (s *urlService) ShortenURL(ctx context.Context, originalURL, userID string)
 		savedURL, err := s.repo.Save(ctx, shortURL, originalURL, userID)
 		if errors.Is(err, repository.ErrURLConflict) {
 			s.logger.Sugar().Infof("%s", err.Error())
-			return fmt.Sprintf("%s/%s", s.baseURL, savedURL.ShortURL), ErrURLExists
+			return s.baseURL + "/" + savedURL.ShortURL, ErrURLExists
 		}
 
 		if errors.Is(err, repository.ErrShortURLConflict) {
@@ -77,7 +86,7 @@ func (s *urlService) ShortenURL(ctx context.Context, originalURL, userID string)
 			return "", err
 		}
 
-		return fmt.Sprintf("%s/%s", s.baseURL, savedURL.ShortURL), nil
+		return s.baseURL + "/" + savedURL.ShortURL, nil
 	}
 
 	s.logger.Sugar().Errorf("не удалось сгенерировать уникальный short_url после %d попыток", maxSaveRetries)
@@ -111,7 +120,7 @@ func (s *urlService) ShortenURLBatch(ctx context.Context, urls []model.BatchRequ
 	for i := range savedRecords {
 		resp[i] = model.BatchResponse{
 			CorrelationID: urls[i].CorrelationID,
-			ShortURL:      fmt.Sprintf("%s/%s", s.baseURL, savedRecords[i].ShortURL),
+			ShortURL:      s.baseURL + "/" + savedRecords[i].ShortURL,
 		}
 	}
 
@@ -143,7 +152,7 @@ func (s *urlService) GetUserURLs(ctx context.Context, userID string) ([]model.Us
 	result := make([]model.UserURLResponse, len(records))
 	for i, record := range records {
 		result[i] = model.UserURLResponse{
-			ShortURL:    fmt.Sprintf("%s/%s", s.baseURL, record.ShortURL),
+			ShortURL:    s.baseURL + "/" + record.ShortURL,
 			OriginalURL: record.OriginalURL,
 		}
 	}

@@ -92,6 +92,9 @@ func (c *compressReader) Close() error {
 	return c.zr.Close()
 }
 
+// GzipMiddleware возвращает middleware, который прозрачно сжимает ответы
+// (когда клиент отправляет Accept-Encoding: gzip) и распаковывает запросы
+// (когда установлен Content-Encoding: gzip).
 func GzipMiddleware(logger *zap.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

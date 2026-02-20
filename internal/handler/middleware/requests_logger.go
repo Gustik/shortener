@@ -30,6 +30,8 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	r.responseData.status = statusCode
 }
 
+// RequestLogger возвращает middleware, который логирует метод, путь, код
+// статуса, размер ответа и длительность каждого HTTP-запроса.
 func RequestLogger(logger *zap.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
+	"github.com/Gustik/shortener/internal/audit"
 	"github.com/Gustik/shortener/internal/config"
 	"github.com/Gustik/shortener/internal/handler"
 	"github.com/Gustik/shortener/internal/repository"
@@ -33,6 +35,15 @@ func main() {
 	}
 	defer logger.Sync()
 
+	if cfg.PprofEnabled {
+		go func() {
+			logger.Info("pprof server listening on :6060")
+			if err := http.ListenAndServe(":6060", nil); err != nil {
+				logger.Error("pprof server error", zap.Error(err))
+			}
+		}()
+	}
+
 	repo, cleanup, err := initRepository(cfg, logger)
 	if err != nil {
 		logger.Fatal("Ошибка инициализации репозитория", zap.Error(err))
@@ -43,8 +54,11 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	auditor, auditCleanup := audit.NewPublisher(cfg, logger)
+	defer auditCleanup()
+
 	svc := service.NewURLService(repo, cfg.BaseURL, logger)
-	h := handler.NewURLHandler(ctx, svc, logger)
+	h := handler.NewURLHandler(ctx, svc, logger, auditor)
 	router := handler.SetupRoutes(h, cfg.JWTSecret)
 
 	runServerWithGracefulShutdown(cancel, cfg.ServerAddress.String(), router, logger)
