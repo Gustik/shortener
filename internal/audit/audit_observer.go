@@ -33,9 +33,6 @@ func NewFileObserver(file *os.File) *FileObserver {
 }
 
 func (f *FileObserver) Notify(event model.AuditEvent) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
 	data, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed to marshal event: %w", err)
@@ -43,9 +40,11 @@ func (f *FileObserver) Notify(event model.AuditEvent) error {
 
 	data = append(data, '\n')
 
+	f.mu.Lock()
 	if _, err = f.file.Write(data); err != nil {
 		return fmt.Errorf("failed to write event: %w", err)
 	}
+	defer f.mu.Unlock()
 
 	return nil
 }
