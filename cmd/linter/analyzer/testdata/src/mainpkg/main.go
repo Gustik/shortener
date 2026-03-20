@@ -8,6 +8,7 @@ import (
 func main() {
 	log.Fatal("allowed in main")
 	os.Exit(0)
+	panic("panic is forbidden even in main") // want `use of panic is forbidden`
 }
 
 func notMain() {

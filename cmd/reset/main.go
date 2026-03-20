@@ -36,10 +36,19 @@ func main() {
 	if len(os.Args) > 1 {
 		pattern = os.Args[1]
 	}
+	if err := run(pattern, ""); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
 
+// run запускает генерацию для заданного pattern пакетов.
+// dir задаёт рабочую директорию для packages.Load; пустая строка означает текущую.
+func run(pattern, dir string) error {
 	fset := token.NewFileSet()
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedSyntax | packages.NeedFiles,
+		Dir:  dir,
 		Fset: fset,
 		ParseFile: func(fset *token.FileSet, filename string, src []byte) (*ast.File, error) {
 			return parser.ParseFile(fset, filename, src, parser.ParseComments)
@@ -48,8 +57,7 @@ func main() {
 
 	pkgs, err := packages.Load(cfg, pattern)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error loading packages: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("error loading packages: %w", err)
 	}
 
 	for _, pkg := range pkgs {
@@ -64,12 +72,12 @@ func main() {
 
 		dir := filepath.Dir(pkg.GoFiles[0])
 		if err := writeGenFile(dir, pkg.Name, structs); err != nil {
-			fmt.Fprintf(os.Stderr, "error writing %s: %v\n", dir, err)
-			os.Exit(1)
+			return fmt.Errorf("error writing %s: %w", dir, err)
 		}
 
 		fmt.Printf("generated reset.gen.go in %s (%d structs)\n", dir, len(structs))
 	}
+	return nil
 }
 
 // StructInfo хранит данные об одной структуре для передачи в шаблон.

@@ -9,8 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"golang.org/x/tools/go/packages"
 )
 
 // -update перезаписывает golden-файлы актуальным выводом генератора.
@@ -49,7 +47,11 @@ func TestGenerator(t *testing.T) {
 			t.Cleanup(func() { _ = os.Remove(outFile) })
 
 			// Запускаем генератор на конкретной директории.
-			if err := runGenerator(t, inputDir); err != nil {
+			absDir, err := filepath.Abs(inputDir)
+			if err != nil {
+				t.Fatalf("abs path: %v", err)
+			}
+			if err := run(".", absDir); err != nil {
 				t.Fatalf("generator error: %v", err)
 			}
 
@@ -171,47 +173,6 @@ type Plain struct {
 	if len(structs) != 0 {
 		t.Errorf("expected no structs, got %d", len(structs))
 	}
-}
-
-// runGenerator запускает полный цикл генерации для одной директории.
-// Повторяет логику main(), но для конкретного пути.
-func runGenerator(t *testing.T, dir string) error {
-	t.Helper()
-
-	absDir, err := filepath.Abs(dir)
-	if err != nil {
-		return err
-	}
-
-	fset := token.NewFileSet()
-	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedSyntax | packages.NeedFiles,
-		Fset: fset,
-		Dir:  absDir,
-		ParseFile: func(fset *token.FileSet, filename string, src []byte) (*ast.File, error) {
-			return parser.ParseFile(fset, filename, src, parser.ParseComments)
-		},
-	}
-
-	pkgs, err := packages.Load(cfg, ".")
-	if err != nil {
-		return err
-	}
-
-	for _, pkg := range pkgs {
-		if len(pkg.Errors) > 0 || len(pkg.GoFiles) == 0 {
-			continue
-		}
-		structs := findResetStructs(pkg.Syntax)
-		if len(structs) == 0 {
-			continue
-		}
-		pkgDir := filepath.Dir(pkg.GoFiles[0])
-		if err := writeGenFile(pkgDir, pkg.Name, structs); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // TestGeneratedCodeCompiles проверяет что сгенерированный код валиден с точки зрения go/format.
