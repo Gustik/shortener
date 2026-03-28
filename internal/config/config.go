@@ -70,6 +70,7 @@ type Config struct {
 	AuditFile       string
 	AuditURL        string
 	PprofEnabled    bool
+	EnableHTTPS     bool
 }
 
 // Flags хранит значения, полученные из флагов командной строки.
@@ -79,9 +80,9 @@ type Flags struct {
 	LogLevel        string
 	FileStoragePath string
 	DatabaseDSN     string
-	JWTSecret       string
 	AuditFile       string
 	AuditURL        string
+	EnableHTTPS     bool
 }
 
 // Load создаёт Config, объединяя переменные окружения, флаги командной
@@ -104,7 +105,7 @@ func Load() *Config {
 
 	cfg.BaseURL = getConfigValue("BASE_URL", flags.BaseURL, defaultBaseURL)
 	cfg.LogLevel = getConfigValue("LOG_LEVEL", flags.LogLevel, defaultLogLevel)
-	cfg.JWTSecret = getConfigValue("JWT_SECRET", flags.JWTSecret, defaultJWTSecret)
+	cfg.JWTSecret = getConfigValue("JWT_SECRET", "", defaultJWTSecret)
 
 	cfg.FileStoragePath = getConfigValue("FILE_STORAGE_PATH", flags.FileStoragePath, "")
 	cfg.DatabaseDSN = getConfigValue("DATABASE_DSN", flags.DatabaseDSN, "")
@@ -113,6 +114,12 @@ func Load() *Config {
 
 	if v, ok := os.LookupEnv("PPROF_ENABLED"); ok && v == "true" {
 		cfg.PprofEnabled = true
+	}
+
+	if v, ok := os.LookupEnv("ENABLE_HTTPS"); ok && v == "true" {
+		cfg.EnableHTTPS = true
+	} else if flags.EnableHTTPS {
+		cfg.EnableHTTPS = true
 	}
 
 	if cfg.DatabaseDSN != "" {
@@ -133,7 +140,7 @@ func parseFlags() *Flags {
 	flag.StringVar(&f.FileStoragePath, "f", "", "путь файла данных")
 	flag.StringVar(&f.DatabaseDSN, "d", "", "DSN подключения к бд")
 	flag.StringVar(&f.LogLevel, "l", "", "уровень логирования")
-	flag.StringVar(&f.JWTSecret, "s", "", "секретный ключ для JWT")
+	flag.BoolVar(&f.EnableHTTPS, "s", false, "включить HTTPS")
 	flag.StringVar(&f.AuditFile, "audit-file", "", "путь файла лога аудита")
 	flag.StringVar(&f.AuditURL, "audit-url", "", "URL аудита")
 	flag.Parse()
