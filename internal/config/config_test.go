@@ -236,6 +236,7 @@ func TestGetConfigValue(t *testing.T) {
 		envValue     string
 		setEnv       bool
 		flagValue    string
+		fileValue    string
 		defaultValue string
 		want         string
 	}{
@@ -245,22 +246,34 @@ func TestGetConfigValue(t *testing.T) {
 			envValue:     "env-value",
 			setEnv:       true,
 			flagValue:    "flag-value",
+			fileValue:    "file-value",
 			defaultValue: "default-value",
 			want:         "env-value",
 		},
 		{
-			name:         "flag has priority over default",
+			name:         "flag has priority over file",
 			envKey:       "TEST_VAR",
 			setEnv:       false,
 			flagValue:    "flag-value",
+			fileValue:    "file-value",
 			defaultValue: "default-value",
 			want:         "flag-value",
 		},
 		{
-			name:         "default when no env and no flag",
+			name:         "file has priority over default",
 			envKey:       "TEST_VAR",
 			setEnv:       false,
 			flagValue:    "",
+			fileValue:    "file-value",
+			defaultValue: "default-value",
+			want:         "file-value",
+		},
+		{
+			name:         "default when no env, no flag, no file",
+			envKey:       "TEST_VAR",
+			setEnv:       false,
+			flagValue:    "",
+			fileValue:    "",
 			defaultValue: "default-value",
 			want:         "default-value",
 		},
@@ -270,6 +283,7 @@ func TestGetConfigValue(t *testing.T) {
 			envValue:     "",
 			setEnv:       true,
 			flagValue:    "flag-value",
+			fileValue:    "file-value",
 			defaultValue: "default-value",
 			want:         "",
 		},
@@ -284,7 +298,7 @@ func TestGetConfigValue(t *testing.T) {
 				defer os.Unsetenv(tt.envKey)
 			}
 
-			got := getConfigValue(tt.envKey, tt.flagValue, tt.defaultValue)
+			got := getConfigValue(tt.envKey, tt.flagValue, tt.fileValue, tt.defaultValue)
 			assert.Equal(t, tt.want, got)
 		})
 	}
