@@ -28,7 +28,7 @@ func runServerWithGracefulShutdown(cancel context.CancelFunc, addr string, enabl
 	}
 
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	go func() {
 		if enableHTTPS {
@@ -52,17 +52,20 @@ func runServerWithGracefulShutdown(cancel context.CancelFunc, addr string, enabl
 		}
 	}()
 
-	<-quit
-	logger.Info("Получен сигнал завершения, начинаем graceful shutdown...")
-
-	cancel()
+	sig := <-quit
+	logger.Sugar().Infof("Получен сигнал %s, начинаем graceful shutdown...", sig)
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
 
+	// Сначала завершаем HTTP: ждём окончания всех активных запросов.
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Error("Ошибка при graceful shutdown", zap.Error(err))
 	}
+
+	// Только после этого отменяем контекст приложения —
+	// фоновые горутины (async delete и др.) успели завершить работу.
+	cancel()
 
 	logger.Info("Сервер успешно остановлен")
 }
