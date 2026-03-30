@@ -86,9 +86,10 @@ func TestConfigPriority(t *testing.T) {
 			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 			os.Args = append([]string{"cmd"}, tt.args...)
 
-			cfg := Load()
+			cfg, err := Load()
+			require.NoError(t, err)
 
-			assert.Equal(t, tt.wantAddr, cfg.ServerAddress.String())
+			assert.Equal(t, tt.wantAddr, cfg.ServerAddress)
 			assert.Equal(t, tt.wantBaseURL, cfg.BaseURL)
 			assert.Equal(t, tt.wantLogLevel, cfg.LogLevel)
 
@@ -211,7 +212,8 @@ func TestStorageTypePriority(t *testing.T) {
 			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 			os.Args = append([]string{"cmd"}, tt.args...)
 
-			cfg := Load()
+			cfg, err := Load()
+			require.NoError(t, err)
 
 			assert.Equal(t, tt.wantStorageType, cfg.StorageType, "StorageType mismatch")
 			assert.Equal(t, tt.wantDBDSN, cfg.DatabaseDSN, "DatabaseDSN mismatch")
@@ -225,67 +227,6 @@ func TestStorageTypePriority(t *testing.T) {
 				os.Setenv(key, val)
 			}
 			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-		})
-	}
-}
-
-func TestGetConfigValue(t *testing.T) {
-	tests := []struct {
-		name         string
-		envKey       string
-		envValue     string
-		setEnv       bool
-		flagValue    string
-		defaultValue string
-		want         string
-	}{
-		{
-			name:         "env has priority over flag",
-			envKey:       "TEST_VAR",
-			envValue:     "env-value",
-			setEnv:       true,
-			flagValue:    "flag-value",
-			defaultValue: "default-value",
-			want:         "env-value",
-		},
-		{
-			name:         "flag has priority over default",
-			envKey:       "TEST_VAR",
-			setEnv:       false,
-			flagValue:    "flag-value",
-			defaultValue: "default-value",
-			want:         "flag-value",
-		},
-		{
-			name:         "default when no env and no flag",
-			envKey:       "TEST_VAR",
-			setEnv:       false,
-			flagValue:    "",
-			defaultValue: "default-value",
-			want:         "default-value",
-		},
-		{
-			name:         "empty env value still overrides",
-			envKey:       "TEST_VAR",
-			envValue:     "",
-			setEnv:       true,
-			flagValue:    "flag-value",
-			defaultValue: "default-value",
-			want:         "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			os.Unsetenv(tt.envKey)
-
-			if tt.setEnv {
-				os.Setenv(tt.envKey, tt.envValue)
-				defer os.Unsetenv(tt.envKey)
-			}
-
-			got := getConfigValue(tt.envKey, tt.flagValue, tt.defaultValue)
-			assert.Equal(t, tt.want, got)
 		})
 	}
 }
