@@ -71,19 +71,19 @@ func (n *NetAddr) MarshalText() ([]byte, error) {
 // Теги env задают имена переменных окружения (читает cleanenv).
 // Теги json задают ключи файла конфигурации.
 type Config struct {
-	ServerAddress   string  `env:"SERVER_ADDRESS"    json:"server_address"`
-	BaseURL         string  `env:"BASE_URL"          json:"base_url"`
-	LogLevel        string  `env:"LOG_LEVEL"         json:"log_level"`
-	FileStoragePath string  `env:"FILE_STORAGE_PATH" json:"file_storage_path"`
-	DatabaseDSN     string  `env:"DATABASE_DSN"      json:"database_dsn"`
-	JWTSecret       string  `env:"JWT_SECRET"`
-	AuditFile       string  `env:"AUDIT_FILE"        json:"audit_file"`
-	AuditURL        string  `env:"AUDIT_URL"         json:"audit_url"`
-	EnableHTTPS     bool    `env:"ENABLE_HTTPS"      json:"enable_https"`
-	PprofEnabled    bool    `env:"PPROF_ENABLED"`
-	DBMaxConns      int     `env:"DB_MAX_CONNECTIONS"`
-	DBMinConns      int     `env:"DB_MIN_CONNECTIONS"`
-	StorageType     string  `env:"-"` // вычисляется, не читается из env/файла
+	ServerAddress   string `env:"SERVER_ADDRESS"    json:"server_address"`
+	BaseURL         string `env:"BASE_URL"          json:"base_url"`
+	LogLevel        string `env:"LOG_LEVEL"         json:"log_level"`
+	FileStoragePath string `env:"FILE_STORAGE_PATH" json:"file_storage_path"`
+	DatabaseDSN     string `env:"DATABASE_DSN"      json:"database_dsn"`
+	JWTSecret       string `env:"JWT_SECRET"`
+	AuditFile       string `env:"AUDIT_FILE"        json:"audit_file"`
+	AuditURL        string `env:"AUDIT_URL"         json:"audit_url"`
+	EnableHTTPS     bool   `env:"ENABLE_HTTPS"      json:"enable_https"`
+	PprofEnabled    bool   `env:"PPROF_ENABLED"`
+	DBMaxConns      int    `env:"DB_MAX_CONNECTIONS"`
+	DBMinConns      int    `env:"DB_MIN_CONNECTIONS"`
+	StorageType     string `env:"-"` // вычисляется, не читается из env/файла
 }
 
 // Flags хранит значения флагов командной строки.
