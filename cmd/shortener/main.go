@@ -37,7 +37,11 @@ func printBuildInfo() {
 func main() {
 	printBuildInfo()
 
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Ошибка загрузки конфигурации: %v\n", err)
+		os.Exit(1)
+	}
 
 	logger, err := zaplog.New(cfg.LogLevel)
 	if err != nil {
@@ -55,11 +59,11 @@ func main() {
 		}()
 	}
 
-	repo, cleanup, err := initRepository(cfg, logger)
+	repos, err := NewRepositories(cfg, logger)
 	if err != nil {
 		logger.Fatal("Ошибка инициализации репозитория", zap.Error(err))
 	}
-	defer cleanup()
+	defer repos.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -67,9 +71,9 @@ func main() {
 	auditor, auditCleanup := audit.NewPublisher(cfg, logger)
 	defer auditCleanup()
 
-	svc := service.NewURLService(repo, cfg.BaseURL, logger)
+	svc := service.NewURLService(repos.Repo, cfg.BaseURL, logger)
 	h := handler.NewURLHandler(ctx, svc, logger, auditor)
 	router := handler.SetupRoutes(h, cfg.JWTSecret)
 
-	runServerWithGracefulShutdown(cancel, cfg.ServerAddress.String(), cfg.EnableHTTPS, router, logger)
+	runServerWithGracefulShutdown(cancel, cfg.ServerAddress, cfg.EnableHTTPS, router, logger)
 }
