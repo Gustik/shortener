@@ -205,6 +205,20 @@ func (r SQLURLRepository) DeleteURLs(ctx context.Context, shortURLs []string, us
 	return nil
 }
 
+func (r SQLURLRepository) Stats(ctx context.Context) (int, int, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT
+			COUNT(*) FILTER (WHERE NOT is_deleted),
+			COUNT(DISTINCT user_id)
+		FROM urls
+	`)
+	var urlCount, userCount int
+	if err := row.Scan(&urlCount, &userCount); err != nil {
+		return 0, 0, fmt.Errorf("stats query: %w", err)
+	}
+	return urlCount, userCount, nil
+}
+
 func (r SQLURLRepository) Ping(ctx context.Context) error {
 	return r.pool.Ping(ctx)
 }

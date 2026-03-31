@@ -44,6 +44,8 @@ type URLService interface {
 	GetUserURLs(ctx context.Context, userID string) ([]model.UserURLResponse, error)
 	// DeleteURLs асинхронно помечает указанные короткие URL как удалённые.
 	DeleteURLs(ctx context.Context, userID string, shortURLs []string)
+	// Stats возвращает количество сокращённых URL и уникальных пользователей.
+	Stats(ctx context.Context) (urlCount int, userCount int, err error)
 	// Ping проверяет доступность хранилища.
 	Ping(ctx context.Context) error
 }
@@ -182,6 +184,10 @@ func (s *urlService) DeleteURLs(ctx context.Context, userID string, shortURLs []
 			s.logger.Error("не удалось удалить пачкой урлы", zap.Error(err))
 		}
 	}()
+}
+
+func (s *urlService) Stats(ctx context.Context) (int, int, error) {
+	return s.repo.Stats(ctx)
 }
 
 func (s *urlService) Ping(ctx context.Context) error {
