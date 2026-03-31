@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"net"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -10,7 +11,7 @@ import (
 )
 
 // SetupRoutes создаёт chi-роутер со всеми маршрутами и middleware приложения.
-func SetupRoutes(handler *URLHandler, jwtSecret string) http.Handler {
+func SetupRoutes(handler *URLHandler, jwtSecret string, trustedSubnet *net.IPNet) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(myMiddleware.RequestLogger(handler.logger))
@@ -27,6 +28,7 @@ func SetupRoutes(handler *URLHandler, jwtSecret string) http.Handler {
 	r.Get("/api/user/urls", handler.GetUserURLs)
 	r.With(myMiddleware.ContentTypeMiddleware("application/json")).Delete("/api/user/urls", handler.DeleteUserURLs)
 	r.Get("/ping", handler.Ping)
+	r.With(myMiddleware.TrustedSubnet(trustedSubnet)).Get("/api/internal/stats", handler.GetStats)
 
 	return r
 }

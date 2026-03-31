@@ -278,6 +278,23 @@ func (h *URLHandler) DeleteUserURLs(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// GetStats обрабатывает GET /api/internal/stats.
+// Доступ разрешён только из доверенной подсети (проверка через middleware).
+func (h *URLHandler) GetStats(w http.ResponseWriter, r *http.Request) {
+	urlCount, userCount, err := h.service.Stats(r.Context())
+	if err != nil {
+		h.logger.Error("stats failed", zap.Error(err))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(struct {
+		URLs  int `json:"urls"`
+		Users int `json:"users"`
+	}{URLs: urlCount, Users: userCount})
+}
+
 // Ping обрабатывает GET /ping и возвращает 200, если хранилище доступно.
 func (h *URLHandler) Ping(w http.ResponseWriter, r *http.Request) {
 	err := h.service.Ping(r.Context())

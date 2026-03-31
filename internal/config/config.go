@@ -80,6 +80,7 @@ type Config struct {
 	AuditFile       string `env:"AUDIT_FILE"        json:"audit_file"`
 	AuditURL        string `env:"AUDIT_URL"         json:"audit_url"`
 	EnableHTTPS     bool   `env:"ENABLE_HTTPS"      json:"enable_https"`
+	TrustedSubnet   string `env:"TRUSTED_SUBNET"    json:"trusted_subnet"`
 	PprofEnabled    bool   `env:"PPROF_ENABLED"`
 	DBMaxConns      int    `env:"DB_MAX_CONNECTIONS"`
 	DBMinConns      int    `env:"DB_MIN_CONNECTIONS"`
@@ -96,6 +97,7 @@ type Flags struct {
 	AuditFile       string
 	AuditURL        string
 	EnableHTTPS     bool
+	TrustedSubnet   string
 	ConfigFile      string
 	DBMaxConns      int
 	DBMinConns      int
@@ -172,6 +174,9 @@ func applyFlags(cfg *Config, flags *Flags) {
 	if flags.EnableHTTPS {
 		cfg.EnableHTTPS = true
 	}
+	if flags.TrustedSubnet != "" {
+		cfg.TrustedSubnet = flags.TrustedSubnet
+	}
 	if flags.DBMaxConns != 0 {
 		cfg.DBMaxConns = flags.DBMaxConns
 	}
@@ -188,6 +193,7 @@ func parseFlags() *Flags {
 	flag.StringVar(&f.DatabaseDSN, "d", "", "DSN подключения к бд")
 	flag.StringVar(&f.LogLevel, "l", "", "уровень логирования")
 	flag.BoolVar(&f.EnableHTTPS, "s", false, "включить HTTPS")
+	flag.StringVar(&f.TrustedSubnet, "t", "", "доверенная подсеть в формате CIDR")
 	flag.StringVar(&f.AuditFile, "audit-file", "", "путь файла лога аудита")
 	flag.StringVar(&f.AuditURL, "audit-url", "", "URL аудита")
 	flag.StringVar(&f.ConfigFile, "c", "", "путь к файлу конфигурации (JSON)")

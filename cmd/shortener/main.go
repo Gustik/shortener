@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -71,9 +72,18 @@ func main() {
 	auditor, auditCleanup := audit.NewPublisher(cfg, logger)
 	defer auditCleanup()
 
+	var trustedSubnet *net.IPNet
+	if cfg.TrustedSubnet != "" {
+		var err error
+		_, trustedSubnet, err = net.ParseCIDR(cfg.TrustedSubnet)
+		if err != nil {
+			logger.Fatal("Неверный формат TRUSTED_SUBNET", zap.String("value", cfg.TrustedSubnet), zap.Error(err))
+		}
+	}
+
 	svc := service.NewURLService(repos.Repo, cfg.BaseURL, logger)
 	h := handler.NewURLHandler(ctx, svc, logger, auditor)
-	router := handler.SetupRoutes(h, cfg.JWTSecret)
+	router := handler.SetupRoutes(h, cfg.JWTSecret, trustedSubnet)
 
 	runServerWithGracefulShutdown(cancel, cfg.ServerAddress, cfg.EnableHTTPS, router, logger)
 }

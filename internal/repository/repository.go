@@ -27,6 +27,8 @@ type URLRepository interface {
 	GetByUserID(ctx context.Context, userID string) ([]model.URLRecord, error)
 	// DeleteURLs помечает указанные короткие URL как удалённые для данного пользователя.
 	DeleteURLs(ctx context.Context, shortURLs []string, userID string) error
+	// Stats возвращает количество сокращённых URL и уникальных пользователей.
+	Stats(ctx context.Context) (urlCount int, userCount int, err error)
 	// Ping проверяет доступность хранилища.
 	Ping(ctx context.Context) error
 }
