@@ -15,17 +15,31 @@ import (
 
 const pgDuplicateErrorCode = "23505"
 
+// dbQuerier — минимальный интерфейс над pgxpool.Pool, необходимый репозиторию.
+// Позволяет подменять реализацию в тестах.
+type dbQuerier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Begin(ctx context.Context) (pgx.Tx, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Ping(ctx context.Context) error
+}
+
 // SQLURLRepository — реализация URLRepository на базе PostgreSQL через pgx.
 type SQLURLRepository struct {
-	pool *pgxpool.Pool
+	pool dbQuerier
 }
 
 // NewSQLRepository создаёт новый SQLURLRepository, используя указанный
 // пул соединений.
 func NewSQLRepository(pool *pgxpool.Pool) (*SQLURLRepository, error) {
-	return &SQLURLRepository{
-		pool: pool,
-	}, nil
+	return NewSQLRepositoryWithDB(pool)
+}
+
+// NewSQLRepositoryWithDB создаёт SQLURLRepository с произвольной реализацией
+// dbQuerier. Используется в тестах для подстановки мока.
+func NewSQLRepositoryWithDB(db dbQuerier) (*SQLURLRepository, error) {
+	return &SQLURLRepository{pool: db}, nil
 }
 
 func (r SQLURLRepository) Save(ctx context.Context, shortURL, originalURL, userID string) (*model.URLRecord, error) {
