@@ -19,9 +19,10 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 )
 
-func runServerWithGracefulShutdown(cancel context.CancelFunc, addr string, enableHTTPS bool, handler http.Handler, logger *zap.Logger) {
+func runServerWithGracefulShutdown(cancel context.CancelFunc, addr string, enableHTTPS bool, handler http.Handler, grpcAddr string, grpcServer *grpc.Server, logger *zap.Logger) {
 	server := &http.Server{
 		Addr:    addr,
 		Handler: handler,
@@ -52,6 +53,17 @@ func runServerWithGracefulShutdown(cancel context.CancelFunc, addr string, enabl
 		}
 	}()
 
+	go func() {
+		ln, err := net.Listen("tcp", grpcAddr)
+		if err != nil {
+			logger.Fatal("Ошибка запуска gRPC listener", zap.String("addr", grpcAddr), zap.Error(err))
+		}
+		logger.Sugar().Infof("Запускаем gRPC сервер по адресу %s", grpcAddr)
+		if err := grpcServer.Serve(ln); err != nil {
+			logger.Error("Ошибка при запуске gRPC сервера", zap.Error(err))
+		}
+	}()
+
 	sig := <-quit
 	logger.Sugar().Infof("Получен сигнал %s, начинаем graceful shutdown...", sig)
 
@@ -60,8 +72,11 @@ func runServerWithGracefulShutdown(cancel context.CancelFunc, addr string, enabl
 
 	// Сначала завершаем HTTP: ждём окончания всех активных запросов.
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		logger.Error("Ошибка при graceful shutdown", zap.Error(err))
+		logger.Error("Ошибка при graceful shutdown HTTP", zap.Error(err))
 	}
+
+	// Graceful shutdown gRPC сервера.
+	grpcServer.GracefulStop()
 
 	// Только после этого отменяем контекст приложения —
 	// фоновые горутины (async delete и др.) успели завершить работу.

@@ -20,6 +20,7 @@ const (
 
 const (
 	defaultServerAddress = "localhost:8080"
+	defaultGRPCAddress   = "localhost:3200"
 	defaultBaseURL       = "http://localhost:8080"
 	defaultLogLevel      = "info"
 	defaultJWTSecret     = "default-secret-key-change-in-production"
@@ -72,6 +73,7 @@ func (n *NetAddr) MarshalText() ([]byte, error) {
 // Теги json задают ключи файла конфигурации.
 type Config struct {
 	ServerAddress   string `env:"SERVER_ADDRESS"    json:"server_address"`
+	GRPCAddress     string `env:"GRPC_ADDRESS"      json:"grpc_address"`
 	BaseURL         string `env:"BASE_URL"          json:"base_url"`
 	LogLevel        string `env:"LOG_LEVEL"         json:"log_level"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH" json:"file_storage_path"`
@@ -90,6 +92,7 @@ type Config struct {
 // Flags хранит значения флагов командной строки.
 type Flags struct {
 	ServerAddr      string
+	GRPCAddr        string
 	BaseURL         string
 	LogLevel        string
 	FileStoragePath string
@@ -115,6 +118,7 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		ServerAddress: defaultServerAddress,
+		GRPCAddress:   defaultGRPCAddress,
 		BaseURL:       defaultBaseURL,
 		LogLevel:      defaultLogLevel,
 		JWTSecret:     defaultJWTSecret,
@@ -153,6 +157,9 @@ func applyFlags(cfg *Config, flags *Flags) {
 	if flags.ServerAddr != "" {
 		cfg.ServerAddress = flags.ServerAddr
 	}
+	if flags.GRPCAddr != "" {
+		cfg.GRPCAddress = flags.GRPCAddr
+	}
 	if flags.BaseURL != "" {
 		cfg.BaseURL = flags.BaseURL
 	}
@@ -188,6 +195,7 @@ func applyFlags(cfg *Config, flags *Flags) {
 func parseFlags() *Flags {
 	f := &Flags{}
 	flag.StringVar(&f.ServerAddr, "a", "", "адрес и порт сервера в формате host:port")
+	flag.StringVar(&f.GRPCAddr, "g", "", "адрес и порт gRPC-сервера в формате host:port")
 	flag.StringVar(&f.BaseURL, "b", "", "базовый URL для сокращенных ссылок")
 	flag.StringVar(&f.FileStoragePath, "f", "", "путь файла данных")
 	flag.StringVar(&f.DatabaseDSN, "d", "", "DSN подключения к бд")
@@ -208,6 +216,7 @@ func printConfigInfo(cfg *Config) {
 	log.Println("Конфигурация загружена")
 	log.Println("---")
 	log.Println("addr:", cfg.ServerAddress)
+	log.Println("grpcAddr:", cfg.GRPCAddress)
 	log.Println("baseURL:", cfg.BaseURL)
 	log.Println("logLevel:", cfg.LogLevel)
 	log.Println("fileStoragePath:", cfg.FileStoragePath)

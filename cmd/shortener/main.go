@@ -9,12 +9,15 @@ import (
 	"os"
 
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 
 	"github.com/Gustik/shortener/internal/audit"
 	"github.com/Gustik/shortener/internal/config"
+	"github.com/Gustik/shortener/internal/grpcserver"
 	"github.com/Gustik/shortener/internal/handler"
 	"github.com/Gustik/shortener/internal/service"
 	"github.com/Gustik/shortener/internal/zaplog"
+	pb "github.com/Gustik/shortener/pkg/shortener/v1"
 )
 
 var (
@@ -85,5 +88,9 @@ func main() {
 	h := handler.NewURLHandler(ctx, svc, logger, auditor)
 	router := handler.SetupRoutes(h, cfg.JWTSecret, trustedSubnet)
 
-	runServerWithGracefulShutdown(cancel, cfg.ServerAddress, cfg.EnableHTTPS, router, logger)
+	authInterceptor := grpcserver.NewAuthInterceptor(cfg.JWTSecret, logger)
+	grpcSrv := grpc.NewServer(grpc.UnaryInterceptor(authInterceptor))
+	pb.RegisterShortenerServiceServer(grpcSrv, grpcserver.NewShortenerServer(svc, logger))
+
+	runServerWithGracefulShutdown(cancel, cfg.ServerAddress, cfg.EnableHTTPS, router, cfg.GRPCAddress, grpcSrv, logger)
 }
