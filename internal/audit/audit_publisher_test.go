@@ -99,3 +99,11 @@ func TestNewPublisher_WithAuditURL(t *testing.T) {
 	_, ok := pub.(*AuditPublisher)
 	assert.True(t, ok)
 }
+
+func TestDummyPublisher(t *testing.T) {
+	pub := DummyPublisher{}
+
+	// Register и Publish — no-ops, не должны паниковать
+	pub.Register(&mockObserver{id: "obs1"})
+	pub.Publish(model.AuditEvent{Action: "shorten", UserID: "user1", URL: "https://ya.ru"})
+}

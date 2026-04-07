@@ -20,6 +20,7 @@ const (
 
 const (
 	defaultServerAddress = "localhost:8080"
+	defaultGRPCAddress   = "localhost:3200"
 	defaultBaseURL       = "http://localhost:8080"
 	defaultLogLevel      = "info"
 	defaultJWTSecret     = "default-secret-key-change-in-production"
@@ -72,6 +73,7 @@ func (n *NetAddr) MarshalText() ([]byte, error) {
 // Теги json задают ключи файла конфигурации.
 type Config struct {
 	ServerAddress   string `env:"SERVER_ADDRESS"    json:"server_address"`
+	GRPCAddress     string `env:"GRPC_ADDRESS"      json:"grpc_address"`
 	BaseURL         string `env:"BASE_URL"          json:"base_url"`
 	LogLevel        string `env:"LOG_LEVEL"         json:"log_level"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH" json:"file_storage_path"`
@@ -80,6 +82,7 @@ type Config struct {
 	AuditFile       string `env:"AUDIT_FILE"        json:"audit_file"`
 	AuditURL        string `env:"AUDIT_URL"         json:"audit_url"`
 	EnableHTTPS     bool   `env:"ENABLE_HTTPS"      json:"enable_https"`
+	TrustedSubnet   string `env:"TRUSTED_SUBNET"    json:"trusted_subnet"`
 	PprofEnabled    bool   `env:"PPROF_ENABLED"`
 	DBMaxConns      int    `env:"DB_MAX_CONNECTIONS"`
 	DBMinConns      int    `env:"DB_MIN_CONNECTIONS"`
@@ -89,6 +92,7 @@ type Config struct {
 // Flags хранит значения флагов командной строки.
 type Flags struct {
 	ServerAddr      string
+	GRPCAddr        string
 	BaseURL         string
 	LogLevel        string
 	FileStoragePath string
@@ -96,6 +100,7 @@ type Flags struct {
 	AuditFile       string
 	AuditURL        string
 	EnableHTTPS     bool
+	TrustedSubnet   string
 	ConfigFile      string
 	DBMaxConns      int
 	DBMinConns      int
@@ -113,6 +118,7 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		ServerAddress: defaultServerAddress,
+		GRPCAddress:   defaultGRPCAddress,
 		BaseURL:       defaultBaseURL,
 		LogLevel:      defaultLogLevel,
 		JWTSecret:     defaultJWTSecret,
@@ -151,6 +157,9 @@ func applyFlags(cfg *Config, flags *Flags) {
 	if flags.ServerAddr != "" {
 		cfg.ServerAddress = flags.ServerAddr
 	}
+	if flags.GRPCAddr != "" {
+		cfg.GRPCAddress = flags.GRPCAddr
+	}
 	if flags.BaseURL != "" {
 		cfg.BaseURL = flags.BaseURL
 	}
@@ -172,6 +181,9 @@ func applyFlags(cfg *Config, flags *Flags) {
 	if flags.EnableHTTPS {
 		cfg.EnableHTTPS = true
 	}
+	if flags.TrustedSubnet != "" {
+		cfg.TrustedSubnet = flags.TrustedSubnet
+	}
 	if flags.DBMaxConns != 0 {
 		cfg.DBMaxConns = flags.DBMaxConns
 	}
@@ -183,11 +195,13 @@ func applyFlags(cfg *Config, flags *Flags) {
 func parseFlags() *Flags {
 	f := &Flags{}
 	flag.StringVar(&f.ServerAddr, "a", "", "адрес и порт сервера в формате host:port")
+	flag.StringVar(&f.GRPCAddr, "g", "", "адрес и порт gRPC-сервера в формате host:port")
 	flag.StringVar(&f.BaseURL, "b", "", "базовый URL для сокращенных ссылок")
 	flag.StringVar(&f.FileStoragePath, "f", "", "путь файла данных")
 	flag.StringVar(&f.DatabaseDSN, "d", "", "DSN подключения к бд")
 	flag.StringVar(&f.LogLevel, "l", "", "уровень логирования")
 	flag.BoolVar(&f.EnableHTTPS, "s", false, "включить HTTPS")
+	flag.StringVar(&f.TrustedSubnet, "t", "", "доверенная подсеть в формате CIDR")
 	flag.StringVar(&f.AuditFile, "audit-file", "", "путь файла лога аудита")
 	flag.StringVar(&f.AuditURL, "audit-url", "", "URL аудита")
 	flag.StringVar(&f.ConfigFile, "c", "", "путь к файлу конфигурации (JSON)")
@@ -202,6 +216,7 @@ func printConfigInfo(cfg *Config) {
 	log.Println("Конфигурация загружена")
 	log.Println("---")
 	log.Println("addr:", cfg.ServerAddress)
+	log.Println("grpcAddr:", cfg.GRPCAddress)
 	log.Println("baseURL:", cfg.BaseURL)
 	log.Println("logLevel:", cfg.LogLevel)
 	log.Println("fileStoragePath:", cfg.FileStoragePath)

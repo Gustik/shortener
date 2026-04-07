@@ -121,6 +121,21 @@ func (r *InMemoryURLRepository) DeleteURLs(ctx context.Context, shortURLs []stri
 	return nil
 }
 
+func (r *InMemoryURLRepository) Stats(_ context.Context) (int, int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	users := make(map[string]struct{})
+	urlCount := 0
+	for i := range r.urls {
+		if !r.urls[i].IsDeleted {
+			urlCount++
+		}
+		users[r.urls[i].UserID] = struct{}{}
+	}
+	return urlCount, len(users), nil
+}
+
 func (r *InMemoryURLRepository) Ping(ctx context.Context) error {
 	return nil
 }

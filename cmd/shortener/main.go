@@ -3,17 +3,21 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 
 	"github.com/Gustik/shortener/internal/audit"
 	"github.com/Gustik/shortener/internal/config"
+	"github.com/Gustik/shortener/internal/grpcserver"
 	"github.com/Gustik/shortener/internal/handler"
 	"github.com/Gustik/shortener/internal/service"
 	"github.com/Gustik/shortener/internal/zaplog"
+	pb "github.com/Gustik/shortener/pkg/shortener/v1"
 )
 
 var (
@@ -71,9 +75,22 @@ func main() {
 	auditor, auditCleanup := audit.NewPublisher(cfg, logger)
 	defer auditCleanup()
 
+	var trustedSubnet *net.IPNet
+	if cfg.TrustedSubnet != "" {
+		var err error
+		_, trustedSubnet, err = net.ParseCIDR(cfg.TrustedSubnet)
+		if err != nil {
+			logger.Fatal("Неверный формат TRUSTED_SUBNET", zap.String("value", cfg.TrustedSubnet), zap.Error(err))
+		}
+	}
+
 	svc := service.NewURLService(repos.Repo, cfg.BaseURL, logger)
 	h := handler.NewURLHandler(ctx, svc, logger, auditor)
-	router := handler.SetupRoutes(h, cfg.JWTSecret)
+	router := handler.SetupRoutes(h, cfg.JWTSecret, trustedSubnet)
 
-	runServerWithGracefulShutdown(cancel, cfg.ServerAddress, cfg.EnableHTTPS, router, logger)
+	authInterceptor := grpcserver.NewAuthInterceptor(cfg.JWTSecret, logger)
+	grpcSrv := grpc.NewServer(grpc.UnaryInterceptor(authInterceptor))
+	pb.RegisterShortenerServiceServer(grpcSrv, grpcserver.NewShortenerServer(svc, logger))
+
+	runServerWithGracefulShutdown(cancel, cfg.ServerAddress, cfg.EnableHTTPS, router, cfg.GRPCAddress, grpcSrv, logger)
 }

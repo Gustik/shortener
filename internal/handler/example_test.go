@@ -20,7 +20,7 @@ import (
 func ExampleURLHandler_ShortenURL() {
 	repo := repository.NewInMemoryURLRepository()
 	svc := service.NewURLService(repo, baseURL, zaplog.NewNoop())
-	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), svc, zaplog.NewNoop(), audit.DummyPublisher{}), jwtSecret)
+	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), svc, zaplog.NewNoop(), audit.DummyPublisher{}), jwtSecret, nil)
 
 	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://practicum.yandex.ru"))
 	r.Header.Set("Content-Type", "text/plain")
@@ -38,7 +38,7 @@ func ExampleURLHandler_ShortenURL() {
 func ExampleURLHandler_ShortenURLV2() {
 	repo := repository.NewInMemoryURLRepository()
 	svc := service.NewURLService(repo, baseURL, zaplog.NewNoop())
-	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), svc, zaplog.NewNoop(), audit.DummyPublisher{}), jwtSecret)
+	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), svc, zaplog.NewNoop(), audit.DummyPublisher{}), jwtSecret, nil)
 
 	body, _ := json.Marshal(model.Request{URL: "https://practicum.yandex.ru"})
 	r := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewReader(body))
@@ -60,7 +60,7 @@ func ExampleURLHandler_ShortenURLV2() {
 func ExampleURLHandler_GetOriginalURL() {
 	repo := repository.NewInMemoryURLRepository()
 	svc := service.NewURLService(repo, baseURL, zaplog.NewNoop())
-	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), svc, zaplog.NewNoop(), audit.DummyPublisher{}), jwtSecret)
+	router := handler.SetupRoutes(handler.NewURLHandler(context.Background(), svc, zaplog.NewNoop(), audit.DummyPublisher{}), jwtSecret, nil)
 
 	// Pre-populate a short URL in the repository.
 	repo.Save(context.Background(), "abc123", "https://practicum.yandex.ru", "user1")
